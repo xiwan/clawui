@@ -1,0 +1,16 @@
+{
+  "id": "data_table",
+  "version": "v0.8",
+  "description": "Data table with columns and rows",
+  "dataSchema": {
+    "title": "string",
+    "columns": "array",
+    "rows": "array"
+  },
+  "components": [
+    { "id": "root", "component": "Column", "children": ["header", "table-head", "table-body"] },
+    { "id": "header", "component": "Text", "text": "{{title}}", "variant": "h1" },
+    { "id": "table-head", "component": "Row", "children": [] },
+    { "id": "table-body", "component": "Column", "children": [] }
+  ]
+}

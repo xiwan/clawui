@@ -1,0 +1,20 @@
+{
+  "id": "form",
+  "version": "v0.9",
+  "description": "Dynamic form with configurable fields",
+  "dataSchema": {
+    "title": "string",
+    "fields": "array"
+  },
+  "components": [
+    { "id": "root", "component": "Column", "children": ["header", "fields", "actions"] },
+    { "id": "header", "component": "Text", "text": "{{title}}", "variant": "h1" },
+    { "id": "fields", "component": "Column", "children": [] },
+    { "id": "actions", "component": "Row", "children": ["submit-btn"] },
+    { "id": "submit-btn", "component": "Button", "child": "submit-label", "variant": "primary", "action": { "event": { "name": "submit" } } },
+    { "id": "submit-label", "component": "Text", "text": "Submit" }
+  ],
+  "defaultActions": {
+    "submit": { "builtin": "agent.prompt" }
+  }
+}

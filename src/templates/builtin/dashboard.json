@@ -1,0 +1,14 @@
+{
+  "id": "dashboard",
+  "version": "v0.9",
+  "description": "Data dashboard with metric cards",
+  "dataSchema": {
+    "title": "string",
+    "metrics": "array"
+  },
+  "components": [
+    { "id": "root", "component": "Column", "children": ["header", "metrics"] },
+    { "id": "header", "component": "Text", "text": "{{title}}", "variant": "h1" },
+    { "id": "metrics", "component": "Row", "children": [] }
+  ]
+}

@@ -1,0 +1,24 @@
+{
+  "id": "confirmation",
+  "version": "v0.9",
+  "description": "Confirmation dialog with two buttons",
+  "dataSchema": {
+    "title": "string",
+    "message": "string",
+    "confirmLabel": "string",
+    "cancelLabel": "string"
+  },
+  "components": [
+    { "id": "root", "component": "Column", "children": ["header", "body", "actions"] },
+    { "id": "header", "component": "Text", "text": "{{title}}", "variant": "h1" },
+    { "id": "body", "component": "Text", "text": "{{message}}" },
+    { "id": "actions", "component": "Row", "children": ["confirm-btn", "cancel-btn"] },
+    { "id": "confirm-btn", "component": "Button", "child": "confirm-label", "variant": "primary", "action": { "event": { "name": "confirm" } } },
+    { "id": "confirm-label", "component": "Text", "text": "{{confirmLabel}}" },
+    { "id": "cancel-btn", "component": "Button", "child": "cancel-label", "action": { "event": { "name": "cancel" } } },
+    { "id": "cancel-label", "component": "Text", "text": "{{cancelLabel}}" }
+  ],
+  "defaultActions": {
+    "cancel": { "builtin": "surface.close" }
+  }
+}

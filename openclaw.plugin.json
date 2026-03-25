@@ -1,0 +1,31 @@
+{
+  "id": "clawui",
+  "name": "ClawUI",
+  "description": "High-level A2UI interface generation for AI agents",
+  "configSchema": {
+    "type": "object",
+    "additionalProperties": false,
+    "properties": {
+      "defaultSurfaceId": {
+        "type": "string",
+        "default": "main"
+      },
+      "enableFallback": {
+        "type": "boolean",
+        "default": true
+      },
+      "customTemplatesDir": {
+        "type": "string"
+      },
+      "previewPort": {
+        "type": "number",
+        "default": 19001
+      }
+    }
+  },
+  "uiHints": {
+    "defaultSurfaceId": { "label": "Default Surface ID", "placeholder": "main" },
+    "enableFallback": { "label": "Enable Markdown Fallback" },
+    "customTemplatesDir": { "label": "Custom Templates Directory", "placeholder": "~/.openclaw/clawui-templates" }
+  }
+}

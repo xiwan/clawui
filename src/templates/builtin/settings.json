@@ -1,0 +1,20 @@
+{
+  "id": "settings",
+  "version": "v0.9",
+  "description": "Settings panel with toggles and text fields",
+  "dataSchema": {
+    "title": "string",
+    "settings": "array"
+  },
+  "components": [
+    { "id": "root", "component": "Column", "children": ["header", "items", "actions"] },
+    { "id": "header", "component": "Text", "text": "{{title}}", "variant": "h1" },
+    { "id": "items", "component": "Column", "children": [] },
+    { "id": "actions", "component": "Row", "children": ["save-btn"] },
+    { "id": "save-btn", "component": "Button", "child": "save-label", "variant": "primary", "action": { "event": { "name": "save" } } },
+    { "id": "save-label", "component": "Text", "text": "Save" }
+  ],
+  "defaultActions": {
+    "save": { "builtin": "agent.prompt" }
+  }
+}

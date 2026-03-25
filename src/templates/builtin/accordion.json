@@ -1,0 +1,14 @@
+{
+  "id": "accordion",
+  "version": "v0.8",
+  "description": "Expandable accordion sections",
+  "dataSchema": {
+    "title": "string",
+    "sections": "[{ title: string, content: string }]"
+  },
+  "components": [
+    { "id": "root", "component": "Column", "children": ["header", "items"] },
+    { "id": "header", "component": "Text", "text": "{{title}}", "variant": "h1" },
+    { "id": "items", "component": "Column", "children": [] }
+  ]
+}

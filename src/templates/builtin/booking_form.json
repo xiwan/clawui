@@ -1,0 +1,29 @@
+{
+  "id": "booking_form",
+  "version": "v0.9",
+  "description": "Restaurant booking form",
+  "dataSchema": {
+    "title": "string",
+    "restaurant": "string",
+    "date": "string",
+    "time": "string",
+    "guests": "number"
+  },
+  "components": [
+    { "id": "root", "component": "Column", "children": ["header", "fields", "actions"] },
+    { "id": "header", "component": "Text", "text": "{{title}}", "variant": "h1" },
+    { "id": "fields", "component": "Column", "children": ["restaurant-field", "date-field", "time-field", "guests-field"] },
+    { "id": "restaurant-field", "component": "TextField", "label": "Restaurant", "value": { "path": "/restaurant" } },
+    { "id": "date-field", "component": "DateTimeInput", "label": "Date", "value": { "path": "/date" }, "enableDate": true },
+    { "id": "time-field", "component": "DateTimeInput", "label": "Time", "value": { "path": "/time" }, "enableTime": true },
+    { "id": "guests-field", "component": "TextField", "label": "Guests", "value": { "path": "/guests" } },
+    { "id": "actions", "component": "Row", "children": ["confirm-btn", "cancel-btn"] },
+    { "id": "confirm-btn", "component": "Button", "child": "confirm-label", "variant": "primary", "action": { "event": { "name": "confirm" } } },
+    { "id": "confirm-label", "component": "Text", "text": "Confirm" },
+    { "id": "cancel-btn", "component": "Button", "child": "cancel-label", "action": { "event": { "name": "cancel" } } },
+    { "id": "cancel-label", "component": "Text", "text": "Cancel" }
+  ],
+  "defaultActions": {
+    "cancel": { "builtin": "surface.close" }
+  }
+}

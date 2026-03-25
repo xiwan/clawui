@@ -1,0 +1,40 @@
+{
+  "name": "@openclaw/clawui",
+  "version": "0.4.6",
+  "description": "OpenClaw A2UI plugin — interactive UI output for AI agents",
+  "type": "module",
+  "openclaw": {
+    "extensions": [
+      "./index.ts"
+    ]
+  },
+  "scripts": {
+    "test": "node --import tsx --test test/*.test.ts"
+  },
+  "keywords": [
+    "openclaw",
+    "a2ui",
+    "agent",
+    "ui",
+    "plugin"
+  ],
+  "license": "MIT-0",
+  "peerDependencies": {
+    "openclaw": ">=2026.3.2"
+  },
+  "peerDependenciesMeta": {
+    "openclaw": {
+      "optional": true
+    }
+  },
+  "dependencies": {
+    "@sinclair/typebox": "0.34.48",
+    "@aws-sdk/client-bedrock-runtime": "^3.1015.0",
+    "@aws-sdk/client-s3": "^3.1015.0"
+  },
+  "devDependencies": {
+    "@types/node": "^25.5.0",
+    "tsx": "^4.21.0",
+    "typescript": "^5.7.0"
+  }
+}

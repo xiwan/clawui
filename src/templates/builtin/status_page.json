@@ -1,0 +1,18 @@
+{
+  "id": "status_page",
+  "version": "v0.8",
+  "description": "Operation result with status indicator and optional details",
+  "dataSchema": {
+    "status": "string",
+    "title": "string",
+    "message": "string",
+    "details": "array"
+  },
+  "components": [
+    { "id": "root", "component": "Column", "children": ["icon", "title", "message", "details"] },
+    { "id": "icon", "component": "StatusIndicator", "status": "{{status}}" },
+    { "id": "title", "component": "Text", "text": "{{title}}", "variant": "h1" },
+    { "id": "message", "component": "Text", "text": "{{message}}" },
+    { "id": "details", "component": "Column", "children": [] }
+  ]
+}

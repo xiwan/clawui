@@ -1,0 +1,14 @@
+{
+  "id": "text_display",
+  "version": "v0.9",
+  "description": "Simple text display",
+  "dataSchema": {
+    "title": "string",
+    "text": "string"
+  },
+  "components": [
+    { "id": "root", "component": "Column", "children": ["header", "body"] },
+    { "id": "header", "component": "Text", "text": "{{title}}", "variant": "h1" },
+    { "id": "body", "component": "Text", "text": "{{text}}" }
+  ]
+}
