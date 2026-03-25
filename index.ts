@@ -12,7 +12,9 @@ import { handleUserAction } from "./src/actions/agent-loop.js";
 import { IntentMatcher, type RagConfig } from "./src/rag/matcher.js";
 import { Type } from "@sinclair/typebox";
 
-import { pushSkeleton } from "./src/skeleton/skeleton.js";
+import { pushSkeleton, stopProgressStages, pushDoneHeader } from "./src/skeleton/skeleton.js";
+import { liteRender } from "./src/lite-render.js";
+import { TOOL_DESCRIPTION, toolRoutePrompt, ragReplayPrompt } from "./src/prompts/index.js";
 
 import { randomUUID } from "node:crypto";
 
@@ -30,8 +32,9 @@ import statusPage from "./src/templates/builtin/status_page.json" with { type: "
 import detail from "./src/templates/builtin/detail.json" with { type: "json" };
 import multiCard from "./src/templates/builtin/multi_card.json" with { type: "json" };
 import homeScreen from "./src/templates/builtin/home_screen.json" with { type: "json" };
+import skillList from "./src/templates/builtin/skill_list.json" with { type: "json" };
 
-registerAll([textDisplay, form, confirmation, bookingForm, searchResults, dashboard, settings, accordion, dataTable, statusPage, detail, multiCard, homeScreen] as any);
+registerAll([textDisplay, form, confirmation, bookingForm, searchResults, dashboard, settings, accordion, dataTable, statusPage, detail, multiCard, homeScreen, skillList] as any);
 
 /** 从渲染参数提取摘要文本，用于 RAG 学习 */
 function extractLearnText(p: A2UIRenderParams): string {
@@ -68,6 +71,8 @@ const A2UIRenderSchema = Type.Object({
     duration: Type.Optional(Type.Number({ description: "Duration in ms (default: 3000)" })),
   }, { description: "Show a toast notification" })),
   fallback: Type.Optional(Type.String({ description: "Fallback mode: 'auto' or custom markdown text" })),
+  rawData: Type.Optional(Type.String({ description: "Raw text data — ClawUI auto-selects template and formats (faster, skips manual template selection)" })),
+  intent: Type.Optional(Type.String({ description: "User intent hint for rawData mode (e.g. 'show weather as table')" })),
 }, { additionalProperties: false });
 
 const plugin = {
@@ -159,6 +164,7 @@ const plugin = {
     /** 发消息给 Agent */
     const agentSessions = new Map<string, string>(); // agentId → sessionId
     async function sendToAgent(message: string) {
+      const t0 = Date.now();
       let resolvedAgentId = defaultAgentId;
       if (!sessionKey) {
         try {
@@ -181,8 +187,10 @@ const plugin = {
 
       // 方式1: subagent.run（仅 Gateway request 上下文）
       try {
+        const t1 = Date.now();
+        api.logger?.info?.(`ClawUI timing: route resolved in ${t1 - t0}ms`);
         await api.runtime.subagent.run({ sessionKey, message });
-        api.logger?.info?.("ClawUI subagent.run succeeded");
+        api.logger?.info?.(`ClawUI timing: subagent.run total ${Date.now() - t0}ms (LLM ${Date.now() - t1}ms)`);
         return;
       } catch {}
 
@@ -204,6 +212,8 @@ const plugin = {
         const sessionFile = api.runtime.agent.session.resolveSessionFilePath(sessionId, { agentId: resolvedAgentId });
 
         api.logger?.info?.(`ClawUI runEmbeddedPiAgent: agent=${resolvedAgentId} model=${model} sessionId=${sessionId}`);
+        const t2 = Date.now();
+        api.logger?.info?.(`ClawUI timing: agent setup in ${t2 - t0}ms`);
 
         await api.runtime.agent.runEmbeddedPiAgent({
           sessionId,
@@ -221,9 +231,9 @@ const plugin = {
           timeoutMs: 120_000,
           runId: `clawui-${Date.now()}`,
         });
-        api.logger?.info?.("ClawUI runEmbeddedPiAgent succeeded");
+        api.logger?.info?.(`ClawUI timing: runEmbeddedPiAgent total ${Date.now() - t0}ms (LLM+tools ${Date.now() - t2}ms)`);
       } catch (e: any) {
-        api.logger?.error?.(`ClawUI runEmbeddedPiAgent failed: ${e.message}`);
+        api.logger?.error?.(`ClawUI runEmbeddedPiAgent failed (${Date.now() - t0}ms): ${e.message}`);
       }
     }
 
@@ -248,7 +258,7 @@ const plugin = {
       }
 
       if (resolved?.type === "tool") {
-        const msg = `[ClawUI] 用户操作 "${action.name}" 映射到工具 ${resolved.tool}，参数：${JSON.stringify(resolved.args)}。请调用该工具并用 a2ui_render 渲染结果。`;
+        const msg = toolRoutePrompt(action.name, resolved.tool, resolved.args);
         sendToAgent(msg);
         return;
       }
@@ -275,7 +285,7 @@ const plugin = {
               const replayQuery = result.entry.userQuery || userText;
               const toastMsg = JSON.stringify({ clawui: { toast: { message: `\u26a1 RAG \u547d\u4e2d (${ragMs}ms) | replay \u6a21\u5f0f | \u91cd\u65b0\u62c9\u53d6\u6570\u636e...`, type: "success", duration: 3000 } } });
               pushToPreview(toastMsg);
-              sendToAgent(`[ClawUI] 用户请求: "${replayQuery}"\n请获取最新数据并用 a2ui_render 渲染结果。复用之前的界面结构。`);
+              sendToAgent(ragReplayPrompt(replayQuery));
             }
             return;
           }
@@ -315,25 +325,7 @@ const plugin = {
     api.registerTool({
       name: "a2ui_render",
       label: "A2UI Render",
-      description: `Render interactive UI. Choose a template and provide data. ALWAYS prefer templates over custom components.
-
-Available templates:
-- text_display: { title?, text } — 文本/代码/markdown 展示（目录树、日志、说明文档等）
-- confirmation: { title, message, confirmLabel?, cancelLabel? } — 需要用户确认的操作
-- form: { title?, fields: [{ name, label, type }], submitLabel? } — 收集用户输入
-- data_table: { title?, columns: [{ key, label }], rows: [{ key: value }] } — 结构化数据表格（列表、状态、对比）
-- dashboard: { title?, metrics: [{ label, value, trend? }] } — 数值指标概览
-- status_page: { status: "success"|"error"|"info"|"loading", title, message?, details?: [{ label, value }] } — 操作结果反馈
-- detail: { title?, fields: [{ label, value }] } — 键值对详情（订单、配置、信息卡）
-- multi_card: { title?, columns?: 2|3, cards: [{ title, content?, icon?, action? }] } — 多卡片网格（功能入口、分类展示）
-- search_results: { query?, results: [{ title, snippet }] } — 搜索结果列表
-- settings: { title?, settings: [{ name, label, type: "toggle"|"text" }] } — 设置面板
-- accordion: { sections: [{ title, content }] } — 可折叠的分组内容
-- booking_form: { restaurant?, date?, time?, guests? } — 预订表单
-
-Usage: { "template": "<name>", "data": { ... } }
-For complex pages, combine templates: { "templates": [{ "template": "<name>", "data": {...} }, ...] }
-Only use "components" for truly custom layouts not covered by any template.`,
+      description: TOOL_DESCRIPTION,
       parameters: A2UIRenderSchema,
       execute: async (_toolCallId: string, params: unknown, context?: any) => {
         // 捕获真实 sessionKey（在 Gateway request 上下文中）
@@ -353,7 +345,23 @@ Only use "components" for truly custom layouts not covered by any template.`,
             }
           } catch {}
         }
+        stopProgressStages();
         const p = params as A2UIRenderParams;
+        // rawData 模式: Agent 只传原始数据，liteRender 自动选模板+格式化
+        if ((p as any).rawData) {
+          try {
+            const lite = await liteRender((p as any).rawData, (p as any).intent || "", { region: "us-east-1" });
+            api.logger?.info?.(`ClawUI liteRender: ${lite.ms}ms, in=${lite.inputTokens}, out=${lite.outputTokens}, template=${lite.template}`);
+            p.template = lite.template;
+            p.data = lite.data;
+            // 上报 lite 的 token 用量
+            reportTokenUsage(lite.inputTokens, lite.outputTokens);
+          } catch (e: any) {
+            api.logger?.error?.(`ClawUI liteRender failed: ${e.message}, falling back to text_display`);
+            p.template = "text_display";
+            p.data = { title: (p as any).intent || "结果", text: (p as any).rawData };
+          }
+        }
         const result = executeRender(p);
         const sid = p.surfaceId || "main";
         // 记录当前 surface 的语义信息，供 action 回调生成自然语言
@@ -364,6 +372,7 @@ Only use "components" for truly custom layouts not covered by any template.`,
           model: agentCfg2.model || undefined,
         });
         pushToPreview(result.jsonl, surfaceMeta.get(sid));
+        pushDoneHeader((p.data?.title as string) || p.template || "完成");
         // 推送端到端耗时 toast
         const e2eMs = getQueryElapsed();
         if (e2eMs > 0) {

@@ -1,5 +1,33 @@
 # Changelog
 
+## v0.4.21 — 2026-03-25
+
+liteRender + prompt 集中管理 + 骨架屏进度 + 多项 bug 修复。
+
+### 新增
+
+- **liteRender** — 轻量 LLM 渲染器，Agent 传 rawData 即可，用 Bedrock Haiku toolUse 自动选模板+格式化数据
+- **Prompt 集中管理** — `src/prompts/index.ts` 统一管理所有 prompt（tool description、action、RAG replay、liteRender system）
+- **骨架屏渐进进度** — 等待时 header 随时间更新文案（3s→8s→15s→25s→40s）
+- **pushDoneHeader** — 渲染完成后 header 切换为"已完成"状态
+- **skill_list 模板** — 技能列表卡片，带执行按钮
+- **骨架屏单元测试** — skeletonBlock、skeletonComponents、PROGRESS_STAGES（10 个用例）
+
+### 修复
+
+- **进度 timer 泄漏** — 之前只存第一个 timer 引用靠 ID 范围清理，Node.js 下完全无效；改为数组存所有 timer
+- **扩展消息覆盖主渲染** — tokenUsage/toast 等扩展消息不再触发 renderFrame/finishProgress
+- **sidebar JSONL 覆盖** — sidebar 只显示 canvas 主窗口内容，不被 header/actions/扩展消息覆盖
+- **dataModelUpdate 冗余** — 只读模板不再生成 dataModelUpdate，避免数据重复传输
+- **liteRender JSON 解析** — 从正则提取改为 Bedrock toolUse 强制结构化输出，彻底消除解析失败
+
+### 变更
+
+- **tool description** — 重写为优先推荐 rawData 模式
+- **liteRender prompt** — 8 个模板 + 适用场景提示 + 选择规则
+- **Agent 调用链路** — 增加各阶段 timing 日志
+- **OPERATIONS.md** — 新增 git 管理规范、模拟用户测试方法
+
 ## v0.4.9 — 2026-03-25
 
 流式渲染 + AgentOS 风格首页 + UI 全面优化。

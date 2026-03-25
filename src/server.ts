@@ -8,7 +8,7 @@ import http from "node:http";
 import { executeRender } from "./tool.js";
 import type { ActionMapping } from "./actions/router.js";
 
-export const VERSION = "0.4.9";
+export const VERSION = "0.4.21";
 
 const DEFAULT_PORT = 19001;
 
@@ -173,6 +173,15 @@ export async function handleRequest(
   if (req.method === "POST" && rel === "/render") {
     try {
       const body = JSON.parse(await readBody(req));
+      // rawData 模式: 调 liteRender 自动选模板
+      if (body.rawData) {
+        const { liteRender } = await import("./lite-render.js");
+        const lite = await liteRender(body.rawData, body.intent || "");
+        body.template = lite.template;
+        body.data = lite.data;
+        delete body.rawData;
+        delete body.intent;
+      }
       const result = executeRender(body);
       broadcast(result.jsonl);
       res.writeHead(200, { "Content-Type": "application/json" });

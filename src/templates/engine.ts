@@ -149,6 +149,19 @@ const expanders: Record<string, Expander> = {
     ];
   }),
 
+  skill_list: expandArray("skills-list", "skills", (item, i) => {
+    const id = `skill-${i}`;
+    return [
+      { id, component: "Card", children: [`${id}-head`, `${id}-desc`], style: "skill-card" },
+      { id: `${id}-head`, component: "Row", children: [`${id}-icon`, `${id}-name`, `${id}-run`] },
+      { id: `${id}-icon`, component: "Text", text: String(item.icon || "🎯"), variant: "h2" },
+      { id: `${id}-name`, component: "Text", text: String(item.name || ""), variant: "h3" },
+      { id: `${id}-run`, component: "Button", child: `${id}-run-label`, action: { event: { name: "submit" }, context: { text: item.prompt || `执行技能: ${item.name}` } }, style: "skill-run" },
+      { id: `${id}-run-label`, component: "Text", text: "▶ 执行" },
+      { id: `${id}-desc`, component: "Text", text: String(item.description || "") },
+    ];
+  }),
+
   home_screen: (components, data) => {
     const apps = (data.apps || []) as Record<string, unknown>[];
     const recents = (data.recents || []) as Record<string, unknown>[];

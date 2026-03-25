@@ -13,7 +13,7 @@ interface UiMeta {
 }
 
 /** 骨架占位块：用 Card + 灰色文本模拟内容 */
-function skeletonBlock(id: string, lines = 3): any[] {
+export function skeletonBlock(id: string, lines = 3): any[] {
   const children = Array.from({ length: lines }, (_, i) => `${id}-l${i}`);
   return [
     { id, component: "Card", child: `${id}-col` },
@@ -26,7 +26,7 @@ function skeletonBlock(id: string, lines = 3): any[] {
 }
 
 /** 根据模板类型生成骨架 canvas 组件 */
-function skeletonComponents(meta: UiMeta): any[] {
+export function skeletonComponents(meta: UiMeta): any[] {
   const t = meta.template || "";
 
   // 表格类：表头 + 占位行
@@ -65,7 +65,54 @@ function skeletonComponents(meta: UiMeta): any[] {
   ];
 }
 
-/** 推送骨架屏到 Preview：header(working) + canvas(骨架) + actions(取消) */
+/** 进度阶段定时器 */
+let progressTimers: ReturnType<typeof setTimeout>[] = [];
+
+export const PROGRESS_STAGES = [
+  { delay: 3000, text: "正在理解意图...", status: "working" },
+  { delay: 8000, text: "正在获取数据...", status: "working" },
+  { delay: 15000, text: "正在分析结果...", status: "working" },
+  { delay: 25000, text: "正在生成界面...", status: "working" },
+  { delay: 40000, text: "仍在处理，请耐心等待...", status: "working" },
+];
+
+function startProgressStages(title: string): void {
+  stopProgressStages();
+  for (const stage of PROGRESS_STAGES) {
+    progressTimers.push(setTimeout(() => {
+      const header = executeRender({
+        slot: "header",
+        components: [
+          { id: "root", component: "Row", children: ["t", "s"] },
+          { id: "t", component: "Text", text: title, variant: "h2" },
+          { id: "s", component: "StatusIndicator", status: stage.status, text: stage.text },
+        ],
+      });
+      pushToPreview(header.jsonl);
+    }, stage.delay));
+  }
+}
+
+export function stopProgressStages(): void {
+  for (const t of progressTimers) clearTimeout(t);
+  progressTimers = [];
+}
+
+/** 推送完成状态的 header */
+export function pushDoneHeader(title?: string): void {
+  const header = executeRender({
+    slot: "header",
+    components: [
+      { id: "root", component: "Row", children: ["t", "s"] },
+      { id: "t", component: "Text", text: title || "完成", variant: "h2" },
+      { id: "s", component: "StatusIndicator", status: "done", text: "已完成" },
+    ],
+    state: "idle",
+  });
+  pushToPreview(header.jsonl);
+}
+
+/** 推送骨架屏到 Preview：header(working) + canvas(骨架) + actions(取消) + 渐进进度 */
 export function pushSkeleton(meta: UiMeta): void {
   const title = meta.title || "处理中";
 
@@ -98,4 +145,7 @@ export function pushSkeleton(meta: UiMeta): void {
     ],
   });
   pushToPreview(actions.jsonl);
+
+  // 启动渐进进度阶段
+  startProgressStages(title);
 }

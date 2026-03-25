@@ -1,0 +1,11 @@
+{
+  "id": "skill_list",
+  "name": "Skill List",
+  "description": "List agent skills with run button",
+  "components": [
+    { "id": "root", "component": "Column", "children": ["title", "skills-list"] },
+    { "id": "title", "component": "Text", "text": "{{title}}", "variant": "h2" },
+    { "id": "skills-list", "component": "Column", "children": [] }
+  ],
+  "defaultActions": {}
+}

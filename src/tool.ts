@@ -13,6 +13,11 @@ import type { TaskState } from "./core/state-machine.js";
 
 export const actionRouter = new ActionRouter();
 
+const INPUT_TYPES = new Set(["TextField", "Toggle", "DateTimeInput"]);
+function hasInputFields(components: { component: string; [k: string]: unknown }[]): boolean {
+  return components.some(c => INPUT_TYPES.has(c.component));
+}
+
 export interface A2UIRenderParams {
   template?: string;
   templates?: { template: string; data?: Record<string, unknown> }[];
@@ -57,7 +62,7 @@ export function executeRender(params: A2UIRenderParams): A2UIRenderResult {
     actionRouter.register(surfaceId, mergedActions);
   }
 
-  const jsonl = generateJsonl(surfaceId, components, params.data);
+  const jsonl = generateJsonl(surfaceId, components, hasInputFields(components) ? params.data : undefined);
   const allJsonl = [...extraLines, jsonl].join("\n");
   const fallbackMarkdown = params.fallback === "auto" || params.fallback === undefined
     ? toMarkdown(components)

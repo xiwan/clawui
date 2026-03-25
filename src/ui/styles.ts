@@ -191,6 +191,11 @@ body { font-family: system-ui, -apple-system, sans-serif; background: #0a0a0a; c
 .a2ui-table td { padding: 8px 10px; border-bottom: 1px solid #1a1a1a; color: #d0d0d0; }
 .a2ui-table tr:hover td { background: #151515; }
 
+/* === Skill Card === */
+.a2ui-card.skill-card { display: flex; flex-direction: column; gap: 8px; }
+.a2ui-card.skill-card .a2ui-row { justify-content: space-between; }
+.a2ui-button.skill-run { padding: 6px 14px; font-size: 12px; margin-left: auto; background: #4f46e5; border-color: #4f46e5; }
+
 /* === Skeleton === */
 .skeleton-line { background: linear-gradient(90deg, #1a1a1a 25%, #252525 50%, #1a1a1a 75%); background-size: 200% 100%; animation: shimmer 1.5s infinite; border-radius: 6px; height: 18px; margin: 6px 0; color: transparent !important; }
 .skeleton-header { height: 22px; opacity: .7; }

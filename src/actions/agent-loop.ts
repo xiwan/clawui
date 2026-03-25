@@ -3,6 +3,8 @@
  * Agent 收到后自行决策，可能再次调用 a2ui_render 渲染新界面，形成交互闭环。
  */
 
+import { actionPrompt } from "../prompts/index.js";
+
 export interface UserAction {
   name: string;
   surfaceId: string;
@@ -41,10 +43,7 @@ export function formatActionPrompt(action: UserAction): string {
     intent = `用户在${scene}上触发了操作 "${action.name}"${summary ? "，数据：" + summary : "。"}`;
   }
 
-  return [
-    `[ClawUI] ${intent}`,
-    `请根据用户意图执行相应操作，然后调用 a2ui_render 渲染新界面展示结果。`,
-  ].join("\n");
+  return actionPrompt(intent);
 }
 
 /** 将 formData 转为可读摘要 */
