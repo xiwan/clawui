@@ -1,0 +1,13 @@
+{
+  "id": "home_screen",
+  "name": "Home Screen",
+  "description": "AgentOS home screen with app grid and recent activity",
+  "components": [
+    { "id": "root", "component": "Column", "children": ["greeting", "apps-grid", "recents-section"] },
+    { "id": "greeting", "component": "Text", "text": "👋 {{greeting}}", "variant": "h2" },
+    { "id": "apps-grid", "component": "Row", "children": [] },
+    { "id": "recents-section", "component": "Column", "children": ["recents-title"] },
+    { "id": "recents-title", "component": "Text", "text": "最近活动", "variant": "h3" }
+  ],
+  "defaultActions": {}
+}

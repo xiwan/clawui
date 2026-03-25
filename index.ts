@@ -7,10 +7,12 @@ import { executeRender, actionRouter } from "./src/tool.js";
 import type { A2UIRenderParams } from "./src/tool.js";
 import * as registry from "./src/templates/registry.js";
 import { registerCli } from "./src/cli.js";
-import { pushToPreview, setActionHandler, setAgentProvider, startServer, setLastUserQuery, consumeLastUserQuery, getQueryElapsed } from "./src/server.js";
+import { pushToPreview, setActionHandler, setAgentProvider, startServer, setLastUserQuery, consumeLastUserQuery, getQueryElapsed, reportTokenUsage } from "./src/server.js";
 import { handleUserAction } from "./src/actions/agent-loop.js";
 import { IntentMatcher, type RagConfig } from "./src/rag/matcher.js";
 import { Type } from "@sinclair/typebox";
+
+import { pushSkeleton } from "./src/skeleton/skeleton.js";
 
 import { randomUUID } from "node:crypto";
 
@@ -27,8 +29,9 @@ import dataTable from "./src/templates/builtin/data_table.json" with { type: "js
 import statusPage from "./src/templates/builtin/status_page.json" with { type: "json" };
 import detail from "./src/templates/builtin/detail.json" with { type: "json" };
 import multiCard from "./src/templates/builtin/multi_card.json" with { type: "json" };
+import homeScreen from "./src/templates/builtin/home_screen.json" with { type: "json" };
 
-registerAll([textDisplay, form, confirmation, bookingForm, searchResults, dashboard, settings, accordion, dataTable, statusPage, detail, multiCard] as any);
+registerAll([textDisplay, form, confirmation, bookingForm, searchResults, dashboard, settings, accordion, dataTable, statusPage, detail, multiCard, homeScreen] as any);
 
 /** 从渲染参数提取摘要文本，用于 RAG 学习 */
 function extractLearnText(p: A2UIRenderParams): string {
@@ -290,6 +293,8 @@ const plugin = {
 
     function fallbackToAgent(action: any) {
       const meta = surfaceMeta.get(action.surfaceId || "main");
+      // 立即推送骨架屏，不等 Agent
+      pushSkeleton(meta || { title: (action.context?.text as string) || undefined });
       handleUserAction(
         {
           name: action.name,
@@ -365,6 +370,11 @@ Only use "components" for truly custom layouts not covered by any template.`,
           const e2eToast = JSON.stringify({ clawui: { toast: { message: `\u23f1 \u7aef\u5230\u7aef ${(e2eMs/1000).toFixed(1)}s | LLM \u6e32\u67d3`, type: "info", duration: 4000 } } });
           pushToPreview(e2eToast);
         }
+        // Token usage: 从 context 读取，fallback 用 JSONL 长度估算
+        const usage = context?.usage || context?.tokenUsage;
+        const inputTokens = usage?.inputTokens || usage?.input || Math.round(result.jsonl.length / 4);
+        const outputTokens = usage?.outputTokens || usage?.output || Math.round(result.jsonl.length / 4);
+        reportTokenUsage(inputTokens, outputTokens);
         // RAG 学习：优先用用户原始输入，fallback 到渲染摘要
         if (matcher) {
           const userQ = consumeLastUserQuery();

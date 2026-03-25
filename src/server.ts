@@ -8,7 +8,7 @@ import http from "node:http";
 import { executeRender } from "./tool.js";
 import type { ActionMapping } from "./actions/router.js";
 
-export const VERSION = "0.4.6";
+export const VERSION = "0.4.9";
 
 const DEFAULT_PORT = 19001;
 
@@ -20,7 +20,11 @@ const slotJsonl = new Map<string, string>();
 const sseClients = new Set<http.ServerResponse>();
 
 function broadcast(jsonl: string, uiMeta?: { template?: string; title?: string }) {
-  currentJsonl = jsonl;
+  // 扩展消息（clawui toast/tokenUsage/frameState）不覆盖主渲染内容
+  const isExtOnly = jsonl.split("\n").filter(Boolean).every(line => {
+    try { return !!JSON.parse(line).clawui; } catch { return false; }
+  });
+  if (!isExtOnly) currentJsonl = jsonl;
   if (uiMeta) currentUiMeta = uiMeta;
   // 按 surfaceId 分拣存储
   for (const line of jsonl.split("\n").filter(Boolean)) {
@@ -54,6 +58,20 @@ export function setLastUserQuery(q: string) { _lastUserQuery = q; _queryStartTim
 export function getLastUserQuery(): string { return _lastUserQuery; }
 export function consumeLastUserQuery(): string { const q = _lastUserQuery; _lastUserQuery = ""; return q; }
 export function getQueryElapsed(): number { return _queryStartTime ? Date.now() - _queryStartTime : 0; }
+
+/** Token 使用量追踪 */
+let _sessionTokens = { input: 0, output: 0 };
+let _turnTokens = { input: 0, output: 0 };
+
+export function reportTokenUsage(input: number, output: number): void {
+  _turnTokens = { input, output };
+  _sessionTokens.input += input;
+  _sessionTokens.output += output;
+  const msg = JSON.stringify({ clawui: { tokenUsage: { turn: _turnTokens, session: _sessionTokens } } });
+  broadcast(msg);
+}
+
+export function getTokenUsage() { return { turn: _turnTokens, session: _sessionTokens }; }
 
 export function setActionHandler(handler: typeof onAction) {
   onAction = handler;
@@ -101,8 +119,10 @@ function makePage(basePath: string) {
       <div class="meta-row"><span class="meta-label">Template</span><span class="meta-value" id="meta-tpl">—</span></div>
       <div class="meta-row"><span class="meta-label">Latency</span><span class="meta-value" id="meta-latency">—</span></div>
       <div class="meta-row"><span class="meta-label">Model</span><span class="meta-value" id="meta-model">—</span></div>
+      <div class="meta-row"><span class="meta-label">Turn Tokens</span><span class="meta-value" id="meta-turn-tokens">—</span></div>
+      <div class="meta-row"><span class="meta-label">Session Tokens</span><span class="meta-value" id="meta-session-tokens">—</span></div>
     </div>
-    <div class="sidebar-tab"><button class="active">JSONL</button></div>
+    <div class="sidebar-tab"><button class="active">JSONL</button><button id="copy-jsonl" class="copy-btn">Copy</button></div>
     <div class="sidebar-body" id="jsonl-view"></div>
   </div>
   <div class="sidebar-toggle" id="sidebar-toggle">◀</div>

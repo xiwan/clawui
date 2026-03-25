@@ -149,6 +149,42 @@ const expanders: Record<string, Expander> = {
     ];
   }),
 
+  home_screen: (components, data) => {
+    const apps = (data.apps || []) as Record<string, unknown>[];
+    const recents = (data.recents || []) as Record<string, unknown>[];
+    const appIds: string[] = [];
+    const generated: Record<string, unknown>[] = [];
+
+    for (let i = 0; i < apps.length; i++) {
+      const app = apps[i];
+      const id = `app-${i}`;
+      appIds.push(id);
+      generated.push(
+        { id, component: "Card", children: [`${id}-icon`, `${id}-label`], clickAction: { event: { name: "submit" }, context: { text: app.prompt } }, style: "app-icon" },
+        { id: `${id}-icon`, component: "Text", text: String(app.icon || "📦"), variant: "h1" },
+        { id: `${id}-label`, component: "Text", text: String(app.label || "") },
+      );
+    }
+
+    const recentIds: string[] = [];
+    for (let i = 0; i < recents.length; i++) {
+      const r = recents[i];
+      const id = `recent-${i}`;
+      recentIds.push(id);
+      generated.push(
+        { id, component: "Row", children: [`${id}-icon`, `${id}-label`, `${id}-time`], clickAction: { event: { name: "submit" }, context: { text: r.prompt || r.label } }, style: "recent-item" },
+        { id: `${id}-icon`, component: "Text", text: String(r.icon || "📋") },
+        { id: `${id}-label`, component: "Text", text: String(r.label || "") },
+        { id: `${id}-time`, component: "Text", text: String(r.time || "") },
+      );
+    }
+
+    return components
+      .map(c => c.id === "apps-grid" ? { ...c, children: appIds } : c)
+      .map(c => c.id === "recents-section" ? { ...c, children: ["recents-title", ...recentIds] } : c)
+      .concat(generated);
+  },
+
   multi_card: (components, data) => {
     const cards = (data.cards || []) as Record<string, unknown>[];
     const cols = (data.columns as number) || 2;

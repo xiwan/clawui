@@ -26,6 +26,9 @@ body { font-family: system-ui, -apple-system, sans-serif; background: #0a0a0a; c
 .sidebar-tab { display: flex; border-bottom: 1px solid #1a1a1a; }
 .sidebar-tab button { flex: 1; padding: 8px; font-size: 11px; color: #666; background: none; border: none; cursor: pointer; text-transform: uppercase; letter-spacing: 1px; }
 .sidebar-tab button.active { color: #e0e0e0; border-bottom: 2px solid #4f46e5; }
+.copy-btn { font-size: 11px !important; color: #555 !important; cursor: pointer; margin-left: auto; padding: 4px 10px !important; border-radius: 4px; transition: .15s; }
+.copy-btn:hover { color: #e0e0e0 !important; background: #222; }
+.copy-btn.copied { color: #4ade80 !important; }
 .sidebar-body { flex: 1; overflow-y: auto; padding: 12px; font: 12px/1.6 ui-monospace, monospace; color: #666; white-space: pre-wrap; word-break: break-all; }
 
 /* === Sidebar Meta Panel === */
@@ -38,8 +41,8 @@ body { font-family: system-ui, -apple-system, sans-serif; background: #0a0a0a; c
 /* === Frame Slots === */
 .slot-header { padding: 14px 24px; border-bottom: 1px solid #1a1a1a; background: #0d0d0d; min-height: 52px; display: flex; align-items: center; justify-content: space-between; }
 .slot-canvas { flex: 1; padding: 24px; overflow-y: auto; display: flex; flex-direction: column; align-items: center; }
-.slot-canvas > .surface { width: 100%; max-width: 640px; }
-.slot-actions { padding: 14px 24px; border-top: 1px solid #1a1a1a; background: #0d0d0d; display: flex; align-items: center; justify-content: flex-end; gap: 10px; min-height: 56px; }
+.slot-canvas > .surface { width: 100%; max-width: 960px; }
+.slot-actions { padding: 8px 24px; border-top: 1px solid #1a1a1a; background: #0d0d0d; display: flex; align-items: center; gap: 8px; min-height: 48px; }
 .slot-actions:empty, .slot-actions.hidden { display: none; }
 .slot-context { width: 280px; border-left: 1px solid #1a1a1a; padding: 14px; overflow-y: auto; background: #0a0a0a; }
 .slot-context.hidden { display: none; }
@@ -49,17 +52,27 @@ body { font-family: system-ui, -apple-system, sans-serif; background: #0a0a0a; c
 .canvas-with-context { display: flex; flex: 1; overflow: hidden; }
 .canvas-with-context .slot-canvas { flex: 1; }
 
-/* === Idle State === */
-.idle-screen { display: flex; flex-direction: column; align-items: center; justify-content: center; flex: 1; gap: 32px; padding: 40px; }
-.idle-greeting { font-size: 22px; font-weight: 300; color: #888; }
-.idle-input { width: 100%; max-width: 520px; display: flex; gap: 8px; }
-.idle-input input { flex: 1; padding: 14px 18px; border-radius: 12px; border: 1px solid #333; background: #111; color: #e0e0e0; font-size: 15px; outline: none; }
-.idle-input input:focus { border-color: #4f46e5; }
-.idle-input button { padding: 14px 20px; border-radius: 12px; border: none; background: #4f46e5; color: #fff; font-size: 14px; cursor: pointer; }
-.idle-input button:hover { background: #4338ca; }
-.quick-actions { display: flex; flex-wrap: wrap; gap: 8px; max-width: 520px; }
-.quick-action { padding: 10px 16px; border-radius: 10px; border: 1px solid #222; background: #111; color: #bbb; font-size: 13px; cursor: pointer; transition: .15s; }
-.quick-action:hover { border-color: #4f46e5; color: #e0e0e0; background: #1a1a1a; }
+/* === Home Screen === */
+.home-screen { display: flex; flex-direction: column; align-items: center; flex: 1; padding: 40px 24px; gap: 28px; overflow-y: auto; }
+.home-greeting { font-size: 22px; font-weight: 300; color: #888; }
+.app-grid { display: grid; grid-template-columns: repeat(4, 80px); gap: 16px; justify-content: center; }
+.app-tile { display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 14px 8px; border-radius: 14px; cursor: pointer; transition: .15s; }
+.app-tile:hover { background: #1a1a1a; transform: translateY(-2px); }
+.app-tile:active { transform: scale(.95); }
+.app-tile-icon { font-size: 32px; line-height: 1; }
+.app-tile-label { font-size: 12px; color: #999; }
+.recent-section { width: 100%; max-width: 400px; }
+.recent-title { font-size: 12px; color: #555; text-transform: uppercase; letter-spacing: 1px; margin-bottom: 8px; }
+.recent-row { display: flex; align-items: center; gap: 10px; padding: 8px 12px; border-radius: 8px; cursor: pointer; transition: .15s; }
+.recent-row:hover { background: #1a1a1a; }
+.recent-icon { font-size: 16px; flex-shrink: 0; }
+.recent-label { flex: 1; font-size: 13px; color: #bbb; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.recent-time { font-size: 11px; color: #555; flex-shrink: 0; }
+.home-input { width: 100%; max-width: 400px; display: flex; gap: 8px; }
+.home-input input { flex: 1; padding: 12px 16px; border-radius: 12px; border: 1px solid #333; background: #111; color: #e0e0e0; font-size: 14px; outline: none; }
+.home-input input:focus { border-color: #4f46e5; }
+.home-input button { padding: 12px 18px; border-radius: 12px; border: none; background: #4f46e5; color: #fff; font-size: 14px; cursor: pointer; }
+.home-input button:hover { background: #4338ca; }
 
 /* === Done State === */
 .done-screen { display: flex; flex-direction: column; align-items: center; justify-content: center; flex: 1; gap: 20px; padding: 40px; }
@@ -148,11 +161,11 @@ body { font-family: system-ui, -apple-system, sans-serif; background: #0a0a0a; c
 /* === Nav Buttons === */
 .nav-buttons { display: flex; gap: 8px; margin-left: auto; }
 
-/* === Bottom Input === */
-.bottom-input { display: flex; gap: 8px; padding: 10px 24px; border-top: 1px solid #1a1a1a; background: #0d0d0d; }
-.bottom-input input { flex: 1; padding: 10px 14px; border-radius: 8px; border: 1px solid #333; background: #111; color: #e0e0e0; font-size: 14px; outline: none; }
+/* === Bottom Input (inline in slot-actions) === */
+.bottom-input { display: flex; gap: 8px; flex: 1; min-width: 0; }
+.bottom-input input { flex: 1; padding: 8px 12px; border-radius: 8px; border: 1px solid #333; background: #111; color: #e0e0e0; font-size: 13px; outline: none; min-width: 0; }
 .bottom-input input:focus { border-color: #4f46e5; }
-.bottom-input button { padding: 10px 16px; border-radius: 8px; border: none; background: #4f46e5; color: #fff; font-size: 13px; cursor: pointer; }
+.bottom-input button { padding: 8px 14px; border-radius: 8px; border: none; background: #4f46e5; color: #fff; font-size: 13px; cursor: pointer; white-space: nowrap; }
 .bottom-input button:hover { background: #4338ca; }
 
 /* === Toast === */
@@ -177,4 +190,28 @@ body { font-family: system-ui, -apple-system, sans-serif; background: #0a0a0a; c
 .a2ui-table th { text-align: left; padding: 8px 10px; color: #888; border-bottom: 1px solid #333; font-weight: 500; }
 .a2ui-table td { padding: 8px 10px; border-bottom: 1px solid #1a1a1a; color: #d0d0d0; }
 .a2ui-table tr:hover td { background: #151515; }
+
+/* === Skeleton === */
+.skeleton-line { background: linear-gradient(90deg, #1a1a1a 25%, #252525 50%, #1a1a1a 75%); background-size: 200% 100%; animation: shimmer 1.5s infinite; border-radius: 6px; height: 18px; margin: 6px 0; color: transparent !important; }
+.skeleton-header { height: 22px; opacity: .7; }
+@keyframes shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+
+/* === Mobile === */
+@media (max-width: 768px) {
+  .app-body { flex-direction: column; }
+  .sidebar { width: 100%; max-height: 200px; border-left: none; border-top: 1px solid #1a1a1a; }
+  .sidebar.collapsed { max-height: 0; }
+  .sidebar-toggle { display: none; }
+  .slot-canvas { padding: 12px; }
+  .slot-canvas > .surface { max-width: 100%; }
+  .slot-header { padding: 10px 12px; }
+  .slot-actions { padding: 8px 12px; flex-wrap: wrap; }
+  .slot-context { width: 100%; border-left: none; border-top: 1px solid #1a1a1a; max-height: 150px; }
+  .canvas-with-context { flex-direction: column; }
+  .nav-buttons { display: none; }
+  .app-grid { grid-template-columns: repeat(4, 70px); gap: 12px; }
+  .home-input { max-width: 100%; }
+  .home-screen { padding: 24px 16px; gap: 20px; }
+  .recent-section { max-width: 100%; }
+}
 `;
