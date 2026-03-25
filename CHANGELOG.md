@@ -1,5 +1,30 @@
 # Changelog
 
+## v0.4.9 — 2026-03-25
+
+流式渲染 + AgentOS 风格首页 + UI 全面优化。
+
+### 新增
+
+- **骨架屏** — 用户操作后 ~50ms 内显示骨架占位 UI，不再干等 Agent 响应（10s+）
+- **AgentOS 首页** — 8 个系统应用图标网格（天气/监控/搜索/定时/Agent/文件/备忘/设置）+ 最近活动列表
+- **home_screen 模板** — 首页模板化，支持不同 Agent 配置不同桌面应用
+- **Token 用量显示** — sidebar 展示当轮 / 累计 token 使用量（input/output）
+- **JSONL Copy 按钮** — sidebar JSONL 面板一键复制，方便调试
+
+### 变更
+
+- **surface 宽度** — 640px → 960px，更好利用 main 区域
+- **slot-actions 合并** — 文字输入和操作按钮合并为一行，节省垂直空间
+- **移动端适配** — 768px 断点响应式布局（sidebar 底部化、app grid 自适应）
+
+### 修复
+
+- **broadcast 覆盖 bug** — 扩展消息（tokenUsage/toast/frameState）不再覆盖主渲染内容
+- 清理旧的 quick-action 全局 click handler 死代码
+
+---
+
 ## v0.4.0 — 2026-03-25
 
 模板驱动 UI 生成：LLM 不再需要输出 A2UI JSON，只需选模板 + 填数据。
