@@ -1,22 +1,35 @@
 # Changelog
 
-## v0.5.0 — 2026-03-26
+## v0.5.13 — 2026-03-26
 
-流式预渲染加速 — 利用 onToolResult 回调并行启动 liteRender，用户看到内容的时间缩短 35-64%。
+流式预渲染加速 + UI Hint 两阶段渲染 + 前端模板化重构。
 
 ### 新增
 
-- **流式预渲染** — Agent 工具执行完成后立即拦截结果，并行启动 liteRender，不等 Agent 后续处理
-- **预渲染去重** — Agent 最终调 a2ui_render 时检测到已预渲染，跳过重复 liteRender
-- **配置开关** — `STREAMING_PRE_RENDER` 常量，可快速关闭回退到串行模式
-- **file_browser 模板** — 文件/目录列表模板（v0.4.26 未记录）
-- **v0.5.0 设计文档** — `docs/v0.5.0-design.md`
+- **UI Hint 两阶段渲染** — Agent 回复第一行输出 `[UI:template|count|title]` 预告，ClawUI 立即渲染模板骨架（真实结构 + loading 占位），Agent 拿到数据后填充覆盖
+- **`pushTemplateSkeleton`** — 根据模板名+条目数生成带 loading 占位的真实模板结构（dashboard 卡片框、search_results 列表、file_browser 网格等）
+- **`onPartialReply` 拦截** — 解析 Agent 流式输出中的 `[UI:...]` 标记，零延迟触发模板骨架
+- **`onToolResult` 预渲染** — Agent 工具执行完成后拦截结果，并行启动 liteRender
+- **预渲染去重** — `a2ui_render` 检测到已预渲染时跳过重复 liteRender，用 Map 支持并发请求
+- **file_browser Finder 网格** — 大图标(36px) + 文件名的网格布局，文件夹/文件分类显示，面包屑导航
+- **前端模板化** — `client.ts`/`styles.ts` 从字符串数组改为读取独立 `.txt`/`.css` 文件，可直接编辑
+
+### 修复
+
+- **search_results 卡片不显示** — Card 组件必须是 expander 返回数组的第一个元素（expandArray 用 `parts[0].id` 作为容器 child）
+- **`[UI:]` 标记泄漏** — rawData 送 liteRender 前清理 `[UI:...]` 标记，防止渲染到界面
+- **Column 不支持 style** — 前端 Column 组件没渲染 style 属性，导致 file-grid CSS 不生效
+- **`shouldEmitToolOutput` 未传** — OpenClaw 默认不传工具文本给 `onToolResult`，需显式传 `() => true`
+- **预渲染全局单例竞态** — 连续请求覆盖 `preRenderState`，改为 `Map<id, state>` 支持并发
+- **`%%BASE_PATH%%` 替换失败** — `String.replace` 只替换第一个匹配，注释里的占位符先被替换
+- **client.js 被 Node 执行** — `.js` 扩展名被模块 loader 当作可执行 JS，改为 `.txt`
 
 ### 变更
 
-- `sendToAgent` 增加 `preRender` 参数，注入 `onToolResult` 回调
-- `fallbackToAgent` 创建 PreRenderState 并传递给 Agent 调用链
-- `a2ui_render execute` 增加预渲染去重判断
+- **prompt 重构** — `actionPrompt` 要求 Agent 先输出 `[UI:]` 预告再调工具，禁止 status_page 预告
+- **defaultApps prompt** — 去掉硬编码的模板指定，让 LLM 自己选最合适的模板
+- **search_results 样式** — 卡片加 hover 位移效果、snippet 限制 3 行、source 字间距
+- **gitignore** — docs/ 整个目录加入 gitignore
 
 ## v0.4.21 — 2026-03-25
 
