@@ -49,16 +49,19 @@ const expanders: Record<string, Expander> = {
     const titleId = `${cardId}-title`;
     const snippetId = `${cardId}-snippet`;
     const children = [titleId, snippetId];
-    const comps: Record<string, unknown>[] = [
+    const comps: Record<string, unknown>[] = [];
+    const childComps: Record<string, unknown>[] = [
       { id: titleId, component: "Text", text: String(item.title || ""), variant: "h3" },
       { id: snippetId, component: "Text", text: `${item.snippet || item.subtitle || item.description || ""}`.trim(), variant: "body" },
     ];
     if (item.source || item.url) {
       const srcId = `${cardId}-src`;
       children.push(srcId);
-      comps.push({ id: srcId, component: "Text", text: String(item.source || item.url || ""), variant: "caption", style: "result-source" });
+      childComps.push({ id: srcId, component: "Text", text: String(item.source || item.url || ""), variant: "caption", style: "result-source" });
     }
+    // Card 必须是第一个元素（expandArray 用 parts[0].id 作为容器 child）
     comps.push({ id: cardId, component: "Card", children, style: "result-card" });
+    comps.push(...childComps);
     return comps;
   }),
 
@@ -295,13 +298,9 @@ const expanders: Record<string, Expander> = {
       const id = `file-${i}`;
       const name = String(item.name || "");
       const icon = isDir ? "📁" : fileIcon(name);
-      const size = item.size ? String(item.size) : "";
-      const modified = item.modified ? String(item.modified) : "";
+      const children = [`${id}-icon`, `${id}-name`];
 
       fileIds.push(id);
-      const children = [`${id}-icon`, `${id}-name`];
-      if (size) children.push(`${id}-size`);
-      if (modified) children.push(`${id}-time`);
 
       const filePath = `${path === "/" ? "" : path}/${name}`;
       const prompt = isDir
@@ -314,13 +313,11 @@ const expanders: Record<string, Expander> = {
         { id: `${id}-icon`, component: "Text", text: icon, style: "file-icon" },
         { id: `${id}-name`, component: "Text", text: name, variant: "body", style: isDir ? "file-name file-name-dir" : "file-name" },
       );
-      if (size) generated.push({ id: `${id}-size`, component: "Text", text: size, variant: "caption", style: "file-meta" });
-      if (modified) generated.push({ id: `${id}-time`, component: "Text", text: modified, variant: "caption", style: "file-meta" });
     }
 
     return components
       .map(c => c.id === "breadcrumb" ? { ...c, children: crumbIds, style: "breadcrumb" } : c)
-      .map(c => c.id === "file-list" ? { ...c, children: fileIds } : c)
+      .map(c => c.id === "file-list" ? { ...c, children: fileIds, style: "file-grid" } : c)
       .concat(generated);
   },
 };

@@ -1,5 +1,23 @@
 # Changelog
 
+## v0.5.0 — 2026-03-26
+
+流式预渲染加速 — 利用 onToolResult 回调并行启动 liteRender，用户看到内容的时间缩短 35-64%。
+
+### 新增
+
+- **流式预渲染** — Agent 工具执行完成后立即拦截结果，并行启动 liteRender，不等 Agent 后续处理
+- **预渲染去重** — Agent 最终调 a2ui_render 时检测到已预渲染，跳过重复 liteRender
+- **配置开关** — `STREAMING_PRE_RENDER` 常量，可快速关闭回退到串行模式
+- **file_browser 模板** — 文件/目录列表模板（v0.4.26 未记录）
+- **v0.5.0 设计文档** — `docs/v0.5.0-design.md`
+
+### 变更
+
+- `sendToAgent` 增加 `preRender` 参数，注入 `onToolResult` 回调
+- `fallbackToAgent` 创建 PreRenderState 并传递给 Agent 调用链
+- `a2ui_render execute` 增加预渲染去重判断
+
 ## v0.4.21 — 2026-03-25
 
 liteRender + prompt 集中管理 + 骨架屏进度 + 多项 bug 修复。

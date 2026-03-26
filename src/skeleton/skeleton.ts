@@ -149,3 +149,55 @@ export function pushSkeleton(meta: UiMeta): void {
   // 启动渐进进度阶段
   startProgressStages(title);
 }
+
+/** 推送模板骨架：真实模板结构 + loading 占位数据 */
+export function pushTemplateSkeleton(template: string, count: number, title: string): void {
+  const loading = "加载中...";
+  let data: Record<string, unknown> = { title };
+
+  switch (template) {
+    case "dashboard":
+      data.metrics = Array.from({ length: count }, (_, i) => ({ label: `指标 ${i + 1}`, value: loading, description: loading }));
+      break;
+    case "data_table":
+      data.columns = [{ key: "c1", label: "—" }, { key: "c2", label: "—" }];
+      data.rows = Array.from({ length: count }, () => ({ c1: loading, c2: loading }));
+      break;
+    case "search_results":
+      data.results = Array.from({ length: count }, (_, i) => ({ title: `结果 ${i + 1}`, snippet: loading }));
+      break;
+    case "file_browser":
+      data.path = "/";
+      data.items = Array.from({ length: count }, (_, i) => ({ name: loading, type: "file" }));
+      break;
+    case "detail":
+      data.fields = Array.from({ length: count }, (_, i) => ({ label: `字段 ${i + 1}`, value: loading }));
+      break;
+    case "multi_card":
+      data.cards = Array.from({ length: count }, (_, i) => ({ title: `项目 ${i + 1}`, content: loading }));
+      break;
+    case "accordion":
+      data.sections = Array.from({ length: count }, (_, i) => ({ title: `第 ${i + 1} 节`, content: loading }));
+      break;
+    case "status_page":
+      data = { status: "info", title, message: loading };
+      break;
+    default: // text_display
+      data = { title, text: loading };
+      break;
+  }
+
+  const canvas = executeRender({ slot: "canvas", template, data });
+  pushToPreview(canvas.jsonl, { template, title });
+
+  // 更新 header
+  const header = executeRender({
+    slot: "header",
+    components: [
+      { id: "root", component: "Row", children: ["t", "s"] },
+      { id: "t", component: "Text", text: title, variant: "h2" },
+      { id: "s", component: "StatusIndicator", status: "working", text: "正在获取数据..." },
+    ],
+  });
+  pushToPreview(header.jsonl);
+}

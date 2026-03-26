@@ -23,18 +23,26 @@ Prefer rawData for simple queries. Use explicit template/templates for complex o
 export function actionPrompt(intent: string): string {
   return [
     `[ClawUI] ${intent}`,
-    `执行操作后，调用 a2ui_render 时请用 rawData 模式：{ "rawData": "<工具返回的原始文本>", "intent": "<用户意图>" }。不要手动选模板，ClawUI 会自动处理。只调一次 a2ui_render，保持简洁。`,
+    `重要：回复的第一行必须输出 UI 预告，格式为 [UI:模板名|条目数|标题]，例如：`,
+    `[UI:dashboard|4|系统监控]`,
+    `[UI:search_results|5|科技新闻]`,
+    `[UI:file_browser|10|当前目录]`,
+    `[UI:text_display|1|回答]`,
+    `模板名从以下选择：dashboard, data_table, search_results, file_browser, detail, multi_card, text_display, accordion。`,
+    `不要选 status_page 作为预告模板，status_page 仅用于操作结果反馈。`,
+    `条目数是预估的数据条数。标题是简短的中文描述。`,
+    `[UI:] 预告是内部标记，不要把它渲染成界面。输出预告后，立即调用工具获取真实数据，然后调用 a2ui_render 的 rawData 模式渲染最终结果。不要渲染中间状态或查询计划。`,
   ].join("\n");
 }
 
 /** 声明式路由命中时的 prompt */
 export function toolRoutePrompt(actionName: string, tool: string, args: unknown): string {
-  return `[ClawUI] 用户操作 "${actionName}" 映射到工具 ${tool}，参数：${JSON.stringify(args)}。请调用该工具，然后用 a2ui_render 的 rawData 模式渲染结果。`;
+  return `[ClawUI] 用户操作 "${actionName}" 映射到工具 ${tool}，参数：${JSON.stringify(args)}。\n回复第一行输出 [UI:模板名|条目数|标题]，然后调用该工具，最后用 a2ui_render 的 rawData 模式渲染结果。`;
 }
 
 /** RAG replay 模式的 prompt */
 export function ragReplayPrompt(query: string): string {
-  return `[ClawUI] 用户请求: "${query}"\n请获取最新数据并用 a2ui_render 的 rawData 模式渲染结果。`;
+  return `[ClawUI] 用户请求: "${query}"\n回复第一行输出 [UI:模板名|条目数|标题]，然后获取最新数据并用 a2ui_render 的 rawData 模式渲染结果。`;
 }
 
 /** lite-render: 轻量 LLM 渲染器的 system prompt */

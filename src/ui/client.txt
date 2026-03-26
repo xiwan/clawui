@@ -1,0 +1,543 @@
+/* ClawUI AgentOS 前端 */
+var B = "%%BASE_PATH%%";
+var statusEl = document.getElementById("conn");
+var jsonlView = document.getElementById("jsonl-view");
+var mainEl = document.getElementById("main");
+var defaultApps = [
+  { icon: "\u2600\ufe0f", label: "\u5929\u6c14", prompt: "\u67e5\u770b\u4eca\u5929\u7684\u5929\u6c14\uff0c\u5305\u542b\u6e29\u5ea6\u3001\u6e7f\u5ea6\u3001\u98ce\u901f\u7b49\u6307\u6807" },
+  { icon: "\ud83d\udcca", label: "\u76d1\u63a7", prompt: "\u67e5\u770b\u5f53\u524d\u7cfb\u7edf CPU\u3001\u5185\u5b58\u3001\u78c1\u76d8\u3001\u8d1f\u8f7d" },
+  { icon: "\ud83d\udd0d", label: "\u641c\u7d22", prompt: "\u641c\u7d22\u4eca\u5929\u7684\u79d1\u6280\u65b0\u95fb\u6458\u8981" },
+  { icon: "\u23f0", label: "\u5b9a\u65f6", prompt: "\u67e5\u770b\u548c\u7ba1\u7406\u6211\u7684\u5b9a\u65f6\u4efb\u52a1" },
+  { icon: "\ud83e\udd16", label: "Agent", prompt: "\u4ecb\u7ecd\u4e00\u4e0b\u4f60\u81ea\u5df1\uff0c\u5305\u62ec\u80fd\u529b\u548c\u53ef\u7528\u5de5\u5177" },
+  { icon: "\ud83d\udcc2", label: "\u6587\u4ef6", prompt: "\u5217\u51fa\u5f53\u524d\u5de5\u4f5c\u76ee\u5f55\u4e0b\u7684\u6587\u4ef6\u548c\u6587\u4ef6\u5939" },
+  { icon: "\ud83d\udcdd", label: "\u5907\u5fd8", prompt: "\u6253\u5f00\u5907\u5fd8\u5f55" },
+  { icon: "\ud83c\udfaf", label: "\u6280\u80fd", prompt: "\u5217\u51fa\u6240\u6709\u53ef\u7528\u7684 skill\uff0c\u5305\u62ec\u540d\u79f0\u3001\u63cf\u8ff0\u548c\u7528\u6cd5" },
+  { icon: "\u2699\ufe0f", label: "\u8bbe\u7f6e", prompt: "\u6253\u5f00 ClawUI \u8bbe\u7f6e\u9762\u677f" }
+];
+var recentActions = [];
+var currentUiMeta = {};
+var frameState = "idle";
+var slotData = {};
+var appPhase = "loading";
+var selectedAgent = localStorage.getItem("clawui_agent") || "";
+var agentList = [];
+var progressEl = document.getElementById("progress-line");
+var progressTimer = null;
+var progressWidth = 0;
+var requestStartTime = 0;
+
+// === Sidebar Toggle ===
+var sidebarEl = document.getElementById("sidebar");
+var sidebarBtn = document.getElementById("sidebar-toggle");
+var sidebarOpen = localStorage.getItem("clawui_sidebar") !== "0";
+if (!sidebarOpen) { sidebarEl.classList.add("collapsed"); sidebarBtn.textContent = "\u25b6"; }
+sidebarBtn.onclick = function() {
+  sidebarOpen = !sidebarOpen;
+  sidebarEl.classList.toggle("collapsed", !sidebarOpen);
+  sidebarBtn.textContent = sidebarOpen ? "\u25c0" : "\u25b6";
+  localStorage.setItem("clawui_sidebar", sidebarOpen ? "1" : "0");
+};
+
+// === Progress Bar ===
+function startProgress() {
+  requestStartTime = Date.now();
+  var latEl = document.getElementById("meta-latency"); if (latEl) { latEl.dataset.locked = ""; latEl.textContent = "..."; latEl.className = "meta-value"; }
+  progressWidth = 0;
+  progressEl.style.width = "0";
+  progressEl.classList.remove("done", "fade");
+  progressEl.classList.add("active");
+  clearInterval(progressTimer);
+  progressTimer = setInterval(function() {
+    progressWidth += (95 - progressWidth) * 0.03;
+    progressEl.style.width = progressWidth + "%";
+  }, 100);
+}
+function finishProgress() {
+  clearInterval(progressTimer);
+  progressEl.classList.add("done");
+  setTimeout(function() { progressEl.classList.add("fade"); }, 500);
+  setTimeout(function() { progressEl.classList.remove("active", "done", "fade"); progressEl.style.width = "0"; }, 3500);
+}
+
+// === Copy JSONL ===
+var copyBtn = document.getElementById("copy-jsonl");
+if (copyBtn) copyBtn.onclick = function() {
+  var text = jsonlView.textContent || "";
+  navigator.clipboard.writeText(text).then(function() {
+    copyBtn.textContent = "Copied!"; copyBtn.classList.add("copied");
+    setTimeout(function() { copyBtn.textContent = "Copy"; copyBtn.classList.remove("copied"); }, 1500);
+  });
+};
+
+// === Sidebar Meta ===
+function updateMeta(uiMeta) {
+  var tplEl = document.getElementById("meta-tpl");
+  var latEl = document.getElementById("meta-latency");
+  var mdlEl = document.getElementById("meta-model");
+  if (tplEl && uiMeta.template) tplEl.textContent = uiMeta.template;
+  if (latEl && requestStartTime && uiMeta.template && !latEl.dataset.locked) {
+    var ms = Date.now() - requestStartTime;
+    latEl.textContent = ms < 1000 ? ms + "ms" : (ms/1000).toFixed(1) + "s";
+    latEl.className = "meta-value highlight";
+    latEl.dataset.locked = "1";
+  }
+  if (mdlEl && uiMeta.model) { var m = uiMeta.model; mdlEl.textContent = m.length > 30 ? m.slice(m.lastIndexOf("/")+1) : m; }
+}
+
+function fmtTokens(t) { return t.input + " in / " + t.output + " out"; }
+function updateTokens(tu) {
+  var turnEl = document.getElementById("meta-turn-tokens");
+  var sessEl = document.getElementById("meta-session-tokens");
+  if (turnEl && tu.turn) turnEl.textContent = fmtTokens(tu.turn);
+  if (sessEl && tu.session) sessEl.textContent = fmtTokens(tu.session);
+}
+
+// === SSE ===
+var es = new EventSource(B + "/events");
+es.onmessage = function(e) {
+  var d = JSON.parse(e.data);
+  if (!d || !d.jsonl) return;
+  handleExtMessages(d.jsonl);
+  var isExtOnly = d.jsonl.split("\n").filter(Boolean).every(function(l){ try { return !!JSON.parse(l).clawui; } catch(e) { return false; } });
+  if (isExtOnly) return;
+  currentUiMeta = d.uiMeta || {};
+  if (d.slots) Object.assign(slotData, d.slots);
+  var canvasJsonl = slotData["main:canvas"] || slotData["main"] || "";
+  if (canvasJsonl) jsonlView.textContent = canvasJsonl;
+  if (appPhase === "active") { updateMeta(currentUiMeta); finishProgress(); renderFrame(); }
+};
+es.onerror = function() { statusEl.textContent = "\u25cb disconnected"; statusEl.className = "conn off"; };
+es.onopen = function() { statusEl.textContent = "\u25cf connected"; statusEl.className = "conn"; };
+
+function handleExtMessages(jsonl) {
+  var lines = jsonl.split("\n").filter(Boolean);
+  for (var i = 0; i < lines.length; i++) {
+    try {
+      var msg = JSON.parse(lines[i]);
+      if (!msg.clawui) continue;
+      if (msg.clawui.frameState) { frameState = msg.clawui.frameState.state; if (frameState === "idle") slotData = {}; }
+      if (msg.clawui.toast) showToast(msg.clawui.toast.message, msg.clawui.toast.type, msg.clawui.toast.duration);
+      if (msg.clawui.tokenUsage) updateTokens(msg.clawui.tokenUsage);
+    } catch(e) {}
+  }
+}
+
+function showToast(msg, type, dur) {
+  var el = document.createElement("div");
+  el.className = "clawui-toast " + (type || "info");
+  el.textContent = msg;
+  document.body.appendChild(el);
+  setTimeout(function() { el.remove(); }, dur || 3000);
+}
+
+// === Init: fetch agents then show selection or go straight to idle ===
+function init() {
+  fetch(B + "/api/agents").then(function(r) { return r.json(); }).then(function(data) {
+    agentList = data.agents || [];
+    var saved = localStorage.getItem("clawui_agent");
+    var found = saved && agentList.find(function(a){return (a.id||a.name)===saved});
+    if (found) {
+      selectedAgent = found.id || found.name;
+      appPhase = "active";
+      renderFrame();
+    } else if (agentList.length === 1) {
+      selectedAgent = agentList[0].id || agentList[0].name;
+      localStorage.setItem("clawui_agent", selectedAgent);
+      appPhase = "active";
+      renderFrame();
+    } else if (agentList.length > 1) {
+      appPhase = "agents";
+      renderAgents();
+    } else {
+      selectedAgent = "demo";
+      localStorage.setItem("clawui_agent", selectedAgent);
+      appPhase = "active";
+      renderFrame();
+    }
+  }).catch(function() {
+    selectedAgent = "demo";
+    appPhase = "active";
+    renderFrame();
+  });
+}
+
+// === Agent Selection Screen ===
+function renderAgents() {
+  var cards = "";
+  for (var i = 0; i < agentList.length; i++) {
+    var a = agentList[i];
+    var name = a.name || a.id || ("Agent " + i);
+    var desc = a.description || "";
+    var id = a.id || name;
+    cards += '<div class="agent-card" data-agent-id="' + esc(id) + '">' +
+      '<div class="agent-name">' + esc(name) + '</div>' +
+      (desc ? '<div class="agent-desc">' + esc(desc) + '</div>' : "") +
+    '</div>';
+  }
+  mainEl.innerHTML =
+    '<div class="agents-screen">' +
+      '<div class="agents-title">\u9009\u62e9\u4e00\u4e2a Agent</div>' +
+      '<div class="agents-subtitle">\u627e\u5230 ' + agentList.length + ' \u4e2a Agent</div>' +
+      '<div class="agents-grid">' + cards + '</div>' +
+    '</div>';
+  document.querySelectorAll(".agent-card").forEach(function(el) {
+    el.onclick = function() {
+      selectedAgent = el.dataset.agentId;
+      localStorage.setItem("clawui_agent", selectedAgent);
+      appPhase = "active";
+      showToast("\u5df2\u8fde\u63a5 " + selectedAgent, "success");
+      renderFrame();
+    };
+  });
+}
+
+// === Active Frame ===
+var navHistory = [];
+function pushNav() { navHistory.push(JSON.stringify({slotData: slotData, frameState: frameState, uiMeta: currentUiMeta})); }
+function renderFrame() {
+  var headerHtml = renderSlotJsonl(findSlot("header"));
+  var canvasHtml = renderSlotJsonl(findSlot("canvas"));
+  var actionsHtml = renderSlotJsonl(findSlot("actions"));
+  var contextHtml = renderSlotJsonl(findSlot("context"));
+  var agentLabel = (agentList.find(function(a){return (a.id||a.name)===selectedAgent})||{}).name || selectedAgent || "ClawUI";
+  var agentBadge = '<div class="agent-badge" id="agent-badge"><span class="agent-badge-dot"></span>' + esc(agentLabel) + (agentList.length > 1 ? ' <span class="agent-badge-switch" id="badge-switch">\u25be</span>' : "") + '</div>';
+  if (frameState === "idle" && !canvasHtml && !headerHtml) {
+    mainEl.innerHTML = idleScreen();
+    bindIdleInput();
+    return;
+  }
+  if (frameState === "working" && !canvasHtml) {
+    mainEl.innerHTML = '<div class="loading-screen"><div class="loading-spinner"></div><div class="loading-text">Agent \u6b63\u5728\u5904\u7406...</div></div>';
+    return;
+  }
+  if (frameState === "done" && !canvasHtml) {
+    mainEl.innerHTML = '<div class="done-screen"><div class="done-icon">\u2705</div><div class="done-title">\u5df2\u5b8c\u6210</div><button class="a2ui-button a2ui-button-primary" data-action="__home__">\u8fd4\u56de\u9996\u9875</button></div>';
+    return;
+  }
+  if (frameState === "error") {
+    var errMsg = canvasHtml || "\u672a\u77e5\u9519\u8bef";
+    mainEl.innerHTML = '<div class="error-panel"><div class="error-icon">\u26a0\ufe0f</div><div class="error-title">\u51fa\u9519\u4e86</div><div class="error-detail">' + errMsg + '</div><div style="display:flex;gap:8px"><button class="a2ui-button" data-action="__home__">\u8fd4\u56de\u9996\u9875</button><button class="a2ui-button a2ui-button-primary" data-action="__retry__">\u91cd\u8bd5</button></div></div>';
+    return;
+  }
+  var navBtns = '<div class="nav-buttons">';
+  if (navHistory.length > 0) navBtns += '<button class="a2ui-button" data-action="__back__">\u2190 \u8fd4\u56de</button>';
+  navBtns += '<button class="a2ui-button" data-action="__home__">\u2302 \u4e3b\u9875</button></div>';
+  var bottomInput = '<div class="bottom-input"><input id="bottom-inp" type="text" placeholder="\u7ee7\u7eed\u5bf9\u8bdd..." /><button id="bottom-send">\u53d1\u9001</button></div>';
+  var showCtx = frameState === "review" && contextHtml;
+  mainEl.innerHTML =
+    '<div class="slot-header">' + agentBadge + (headerHtml || '<div class="a2ui-status"><span class="a2ui-status-dot ' + frameState + '"></span><span>' + frameState + '</span></div>') + '</div>' +
+    '<div class="canvas-with-context">' +
+      '<div class="slot-canvas"><div class="surface">' + (canvasHtml || "") + '</div></div>' +
+      (showCtx ? '<div class="slot-context"><div class="ctx-title">Context</div>' + contextHtml + '</div>' : "") +
+    '</div>' +
+    '<div class="slot-actions">' + bottomInput + (actionsHtml || "") + navBtns + '</div>';
+  bindBottomInput();
+  var bsw = document.getElementById("badge-switch");
+  if (bsw) bsw.onclick = function(e) { e.stopPropagation(); appPhase = "agents"; slotData = {}; frameState = "idle"; renderAgents(); };
+}
+
+function bindBottomInput() {
+  var inp = document.getElementById("bottom-inp");
+  var btn = document.getElementById("bottom-send");
+  if (!inp || !btn) return;
+  function send() { var t = inp.value.trim(); if (t) postAction("submit", { text: t, history: buildHistory() }); }
+  btn.addEventListener("click", send);
+  inp.addEventListener("keydown", function(e) { if (e.key === "Enter") send(); });
+}
+
+function buildHistory() {
+  var h = [];
+  var keys = Object.keys(slotData);
+  for (var i = 0; i < keys.length; i++) {
+    var slot = keys[i];
+    var jsonl = slotData[slot];
+    if (!jsonl) continue;
+    var texts = [];
+    var lines = jsonl.split("\n").filter(Boolean);
+    for (var j = 0; j < lines.length; j++) {
+      try {
+        var msg = JSON.parse(lines[j]);
+        if (msg.surfaceUpdate && msg.surfaceUpdate.components) {
+          for (var k = 0; k < msg.surfaceUpdate.components.length; k++) {
+            var c = msg.surfaceUpdate.components[k];
+            var ct = Object.keys(c.component)[0];
+            var cp = c.component[ct] || {};
+            if (cp.text) {
+              var tv = typeof cp.text === "string" ? cp.text : cp.text.literalString || "";
+              if (tv) texts.push(tv);
+            }
+            if (cp.title) {
+              var ttv = typeof cp.title === "string" ? cp.title : cp.title.literalString || "";
+              if (ttv) texts.push(ttv);
+            }
+          }
+        }
+      } catch(e) {}
+    }
+    if (texts.length) h.push({ slot: slot, texts: texts });
+  }
+  return h;
+}
+
+function findSlot(name) {
+  var keys = Object.keys(slotData);
+  for (var i = 0; i < keys.length; i++) {
+    if (keys[i].split(":")[1] === name) return slotData[keys[i]];
+  }
+  return null;
+}
+
+function idleScreen() {
+  var label = selectedAgent && selectedAgent !== "demo" ? (agentList.find(function(a){return a.id===selectedAgent})||{}).name || selectedAgent : "ClawUI";
+  var appsHtml = "";
+  for (var i = 0; i < defaultApps.length; i++) {
+    var a = defaultApps[i];
+    appsHtml += '<div class="app-tile" data-prompt="' + esc(a.prompt) + '"><div class="app-tile-icon">' + a.icon + '</div><div class="app-tile-label">' + esc(a.label) + '</div></div>';
+  }
+  var recentsHtml = "";
+  for (var j = 0; j < recentActions.length; j++) {
+    var r = recentActions[j];
+    recentsHtml += '<div class="recent-row" data-prompt="' + esc(r.prompt) + '"><span class="recent-icon">' + r.icon + '</span><span class="recent-label">' + esc(r.label) + '</span><span class="recent-time">' + esc(r.time) + '</span></div>';
+  }
+  return '<div class="home-screen">' +
+    '<div class="home-greeting">\ud83d\udc4b \u4f60\u597d\uff0c\u6211\u662f ' + esc(label) + '</div>' +
+    '<div class="app-grid">' + appsHtml + '</div>' +
+    (recentsHtml ? '<div class="recent-section"><div class="recent-title">\u6700\u8fd1\u6d3b\u52a8</div>' + recentsHtml + '</div>' : "") +
+    '<div class="home-input"><input id="idle-inp" type="text" placeholder="\u8f93\u5165\u4f60\u60f3\u505a\u7684\u4e8b..." /><button id="idle-send">\u53d1\u9001</button></div>' +
+    (agentList.length > 1 ? '<div class="idle-settings"><span id="switch-agent">\u21c4 \u5207\u6362 Agent</span></div>' : "") +
+  '</div>';
+}
+
+function bindIdleInput() {
+  var inp = document.getElementById("idle-inp");
+  var btn = document.getElementById("idle-send");
+  var sw = document.getElementById("switch-agent");
+  if (!inp || !btn) return;
+  function send() { var t = inp.value.trim(); if (t) { addRecent("\ud83d\udcac", t); postAction("submit", { text: t }); } }
+  btn.addEventListener("click", send);
+  inp.addEventListener("keydown", function(e) { if (e.key === "Enter") send(); });
+  if (sw) sw.onclick = function() { appPhase = "agents"; slotData = {}; frameState = "idle"; renderAgents(); };
+  var tiles = document.querySelectorAll(".app-tile, .recent-row");
+  for (var i = 0; i < tiles.length; i++) {
+    tiles[i].addEventListener("click", function() {
+      var p = this.getAttribute("data-prompt");
+      if (p) { var icon = this.querySelector(".app-tile-icon"); addRecent(icon ? icon.textContent : "\ud83d\udcac", p); postAction("submit", { text: p }); }
+    });
+  }
+}
+
+function addRecent(icon, text) {
+  recentActions.unshift({ icon: icon, label: text.length > 30 ? text.slice(0,30) + "..." : text, prompt: text, time: "\u521a\u521a" });
+  if (recentActions.length > 5) recentActions.pop();
+}
+
+// === A2UI Renderer ===
+function renderSlotJsonl(jsonl) {
+  if (!jsonl) return "";
+  var lines = jsonl.split("\n").filter(Boolean);
+  var components = [], dataModel = {}, rootId = null;
+  for (var i = 0; i < lines.length; i++) {
+    try { var msg = JSON.parse(lines[i]);
+      if (msg.surfaceUpdate) components = msg.surfaceUpdate.components;
+      if (msg.dataModelUpdate) { dataModel[msg.dataModelUpdate.path.replace(/^\//, "")] = msg.dataModelUpdate.value; }
+      if (msg.beginRendering) rootId = msg.beginRendering.root;
+    } catch(e) {}
+  }
+  if (!components.length) return "";
+  for (var j = 0; j < components.length; j++) { if (!components[j].id) components[j].id = "auto-" + j; }
+  var byId = {}; for (var k = 0; k < components.length; k++) byId[components[k].id] = components[k];
+  // 收集所有被引用的子 ID
+  var referenced = {};
+  for (var ri = 0; ri < components.length; ri++) {
+    var rcomp = Object.values(components[ri].component)[0] || {};
+    if (rcomp.child) referenced[rcomp.child] = true;
+    if (rcomp.children && rcomp.children.explicitList) { for (var rj = 0; rj < rcomp.children.explicitList.length; rj++) referenced[rcomp.children.explicitList[rj]] = true; }
+  }
+  // Card 孤儿收纳：Card 无 child/children 时，把紧跟其后的未引用非容器组件收入
+  for (var ci = 0; ci < components.length; ci++) {
+    var ctype = Object.keys(components[ci].component)[0];
+    var cprops = components[ci].component[ctype] || {};
+    if (ctype === "Card" && !cprops.child && !(cprops.children && cprops.children.explicitList && cprops.children.explicitList.length)) {
+      var adopted = [];
+      for (var ai = ci + 1; ai < components.length; ai++) {
+        var at = Object.keys(components[ai].component)[0];
+        if (at === "Card" || at === "Column" || at === "Row" || at === "Divider" || referenced[components[ai].id]) break;
+        adopted.push(components[ai].id);
+        referenced[components[ai].id] = true;
+      }
+      if (adopted.length) { cprops.children = { explicitList: adopted }; }
+    }
+  }
+  var root = (rootId && byId[rootId]) ? byId[rootId] : null;
+  if (root) return rc(root, byId, dataModel);
+  // 没有 root 容器，渲染所有组件
+  var html = ""; for (var m = 0; m < components.length; m++) html += rc(components[m], byId, dataModel);
+  return html;
+}
+
+function rs(sv, dm) {
+  if (!sv) return "";
+  if (typeof sv === "string") return sv;
+  if (sv.literalString != null) return sv.literalString;
+  if (sv.path) { var k = sv.path.replace(/^\//, ""); return dm[k] != null ? String(dm[k]) : ""; }
+  return "";
+}
+
+function rc(c, byId, dm) {
+  if (!c) return "";
+  var t = Object.keys(c.component)[0];
+  var p = c.component[t] || {};
+  switch (t) {
+    case "Column": return '<div class="a2ui-column' + (p.style ? " " + p.style : "") + '">' + (p.children && p.children.explicitList || []).map(function(id){return rc(byId[id],byId,dm)}).join("") + "</div>";
+    case "Row": return '<div class="a2ui-row' + (p.style ? " " + p.style : "") + '">' + (p.children && p.children.explicitList || []).map(function(id){return rc(byId[id],byId,dm)}).join("") + "</div>";
+    case "Text": { var tv = rs(p.text, dm); var tcls = "a2ui-text-" + (p.usageHint || "body") + (p.accordion_body ? " a2ui-accordion-body" : "") + (p.style ? " " + p.style : ""); return '<div class="' + tcls + '">' + (hasMd(tv) ? md(tv) : esc(tv)) + "</div>"; }
+    case "Button": {
+      var ch = p.child ? byId[p.child] : null;
+      var lb = ch ? rs(Object.values(ch.component)[0].text, dm) : "\u6309\u94ae";
+      if (p.accordion) return '<button class="a2ui-accordion-toggle" data-action="' + esc(p.action && p.action.name || "") + '">' + esc(lb) + "</button>";
+      var cls = "a2ui-button" + (p.variant === "primary" ? " a2ui-button-primary" : "");
+      return '<button class="' + cls + '" data-action="' + esc(p.action && p.action.name || "") + '">' + esc(lb) + "</button>";
+    }
+    case "TextField": return '<div class="a2ui-textfield"><label>' + esc(rs(p.label,dm)) + '</label><input type="text" value="' + esc(rs(p.text,dm)) + '" /></div>';
+    case "DateTimeInput": return '<div class="a2ui-datetime"><label>' + esc(rs(p.label,dm)) + '</label><input type="' + (p.enableTime?"time":"date") + '" /></div>';
+    case "Card": {
+      var ti = rs(p.title,dm); var ch2 = p.child?byId[p.child]:null; var kids = p.children && p.children.explicitList||[];
+      var inner = ch2 ? rc(ch2,byId,dm) : kids.map(function(id){return rc(byId[id],byId,dm)}).join("");
+      var cardCls = "a2ui-card" + (p.style ? " " + p.style : "");
+      var clickAttr = "";
+      if (p.clickAction) { var ca = p.clickAction; var cn = ca.event && ca.event.name || ca.name || "submit"; var cc = ca.context || {}; clickAttr = ' data-action="' + esc(cn) + '" data-context="' + esc(JSON.stringify(cc)) + '"'; }
+      return '<div class="' + cardCls + '"' + clickAttr + '>' + (ti?'<div class="a2ui-card-title">'+esc(ti)+"</div>":"") + inner + "</div>";
+    }
+    case "Toggle": return '<div class="a2ui-toggle"><div class="a2ui-toggle-switch"></div><span>' + esc(rs(p.label,dm)) + "</span></div>";
+    case "Divider": return '<hr class="a2ui-divider" />';
+    case "Image": return '<img class="a2ui-image" src="' + esc(rs(p.url,dm)) + '" />';
+    case "ProgressBar": {
+      var pct = Math.round((p.value||0)*100);
+      return '<div><div class="a2ui-progress"><div class="a2ui-progress-bar" style="width:'+pct+'%"></div></div>' + (p.label?'<div class="a2ui-progress-label">'+esc(rs(p.label,dm))+"</div>":"") + "</div>";
+    }
+    case "StatusIndicator": return '<div class="a2ui-status"><span class="a2ui-status-dot ' + (p.status||"idle") + '"></span><span>' + esc(rs(p.text,dm)||(p.status||"")) + "</span></div>";
+    case "Spacer": return '<div class="a2ui-spacer" style="height:' + (p.size||16) + 'px"></div>';
+    default: return renderUnknown(t, p, c, byId, dm);
+  }
+}
+
+function renderUnknown(t, p, c, byId, dm) {
+  // 先按 type 快速匹配
+  if (p.type === "divider") return '<hr class="a2ui-divider">';
+  if (p.type === "heading") return '<div class="a2ui-text-h' + (p.level||2) + '">' + esc(String(p.text||"")) + "</div>";
+  if ((p.type === "text" || p.type === "info") && (p.content || p.text)) return '<div class="a2ui-md">' + md(String(p.content || p.text || "")) + "</div>";
+  if (p.type === "table" && p.headers) return renderTable(p.headers, p.rows || []);
+  var html = "";
+  if (p.title) html += '<div class="a2ui-text-h2">' + esc(String(p.title)) + "</div>";
+  if (p.subtitle) html += '<div class="a2ui-text-body" style="color:#888">' + esc(String(p.subtitle)) + "</div>";
+  var arr = p.content || p.body;
+  if (arr && typeof arr === "string") html += '<div class="a2ui-md">' + md(arr) + "</div>";
+  if (Array.isArray(arr)) { for (var ci = 0; ci < arr.length; ci++) { html += renderItem(arr[ci], byId, dm); } }
+  if (p.text && typeof p.text === "string") html += '<div class="a2ui-md">' + md(p.text) + "</div>";
+  if (p.text && typeof p.text === "object") html += '<div class="a2ui-md">' + md(rs(p.text, dm)) + "</div>";
+  if (p.value) html += '<div class="a2ui-text-h2">' + esc(String(p.value)) + "</div>";
+  if (p.label && !p.value) html += '<div class="a2ui-text-body" style="color:#999">' + esc(String(p.label)) + "</div>";
+  if (Array.isArray(p.items)) { html += '<div class="a2ui-row" style="flex-wrap:wrap;gap:12px">'; for (var ii = 0; ii < p.items.length; ii++) { html += renderItem(p.items[ii], byId, dm); } html += "</div>"; }
+  if (Array.isArray(p.headers) && Array.isArray(p.rows)) { html += renderTable(p.headers, p.rows); }
+  if (Array.isArray(p.children)) { for (var i = 0; i < p.children.length; i++) { var kid = p.children[i]; if (typeof kid === "string" && byId[kid]) { html += rc(byId[kid], byId, dm); } else if (kid && typeof kid === "object") { html += renderItem(kid, byId, dm); } } }
+  if (p.children && p.children.explicitList) { for (var j = 0; j < p.children.explicitList.length; j++) { var cid = p.children.explicitList[j]; if (byId[cid]) html += rc(byId[cid], byId, dm); } }
+  if (!html) html = "<div>[" + (t||p.type||"unknown") + "]</div>";
+  var cls = p.type === "card" ? "a2ui-card" : p.type === "columns" || p.type === "stat-row" || p.type === "stat-grid" ? "a2ui-row" : "a2ui-column";
+  return '<div class="' + cls + '" style="gap:10px">' + html + "</div>";
+}
+
+function renderItem(item, byId, dm) {
+  if (!item || typeof item !== "object") return "";
+  if (item.type === "divider") return '<hr class="a2ui-divider">';
+  if (item.type === "text" || item.type === "info") return '<div class="a2ui-md">' + md(String(item.content || item.text || "")) + "</div>";
+  if (item.type === "heading") return '<div class="a2ui-text-h3">' + esc(String(item.text || "")) + "</div>";
+  if (item.type === "table" && item.headers) return renderTable(item.headers, item.rows || []);
+  return renderUnknown(item.type || "", item, {id:"item",component:{}}, byId, dm);
+}
+
+function renderTable(headers, rows) {
+  var h = "<tr>"; for (var i = 0; i < headers.length; i++) h += "<th>" + esc(String(headers[i])) + "</th>"; h += "</tr>";
+  var b = ""; for (var r = 0; r < rows.length; r++) { b += "<tr>"; for (var c = 0; c < rows[r].length; c++) b += "<td>" + esc(String(rows[r][c])) + "</td>"; b += "</tr>"; }
+  return '<table class="a2ui-table"><thead>' + h + "</thead><tbody>" + b + "</tbody></table>";
+}
+
+// Minimal markdown -> HTML
+function md(s) {
+  if (!s) return "";
+  s = s.replace(/```([\s\S]*?)```/g, function(m, code) {
+    return '<pre class="a2ui-code">' + esc(code.replace(/^\w*\n/, "")) + "</pre>";
+  });
+  s = s.replace(/`([^`]+)`/g, '<code class="a2ui-inline-code">$1</code>');
+  return s
+    .replace(/^### (.+)$/gm, '<div class="a2ui-text-h3">$1</div>')
+    .replace(/^## (.+)$/gm, '<div class="a2ui-text-h2">$1</div>')
+    .replace(/^# (.+)$/gm, '<div class="a2ui-text-h1">$1</div>')
+    .replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>")
+    .replace(/^- (.+)$/gm, '<div class="a2ui-list-item">\u2022 $1</div>')
+    .replace(/^---$/gm, '<hr class="a2ui-divider">')
+    .replace(/^\|(.+)$/gm, function(m) { return '<div class="a2ui-table-row">' + m + "</div>"; })
+    .replace(/\n/g, "<br>");
+}
+
+function hasMd(s) { return /```|^#{1,3} |\*\*|^- /m.test(s); }
+
+function esc(s) { return String(s).replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;"); }
+
+// === Actions ===
+var actionPending = false;
+function postAction(name, extra) {
+  if (actionPending) return;
+  actionPending = true;
+  showToast("\u2192 " + name + "...", "info", 1500);
+  pushNav();
+  startProgress();
+  frameState = "working";
+  slotData = {};
+  renderFrame();
+  var formData = {};
+  document.querySelectorAll(".a2ui-textfield input, .a2ui-datetime input").forEach(function(inp) {
+    var container = inp.closest(".a2ui-textfield,.a2ui-datetime");
+    var lb = container && container.querySelector("label");
+    if (lb && lb.textContent) formData[lb.textContent] = inp.value;
+  });
+  document.querySelectorAll(".a2ui-toggle").forEach(function(tog) {
+    var sw = tog.querySelector(".a2ui-toggle-switch");
+    var lb = tog.querySelector("span");
+    if (lb && lb.textContent) formData[lb.textContent] = sw && sw.classList.contains("on") || false;
+  });
+  fetch(B + "/action", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ name: name, surfaceId: "main", agent: selectedAgent, context: extra || {}, formData: formData, uiMeta: currentUiMeta })
+  }).then(function(r) { if (!r.ok) showToast("Action failed: " + r.status, "error"); })
+  .catch(function(err) { showToast("Network error: " + err.message, "error"); })
+  .finally(function() { actionPending = false; });
+}
+
+document.addEventListener("click", function(e) {
+  var sw = e.target.closest && e.target.closest(".a2ui-toggle-switch");
+  if (sw) { sw.classList.toggle("on"); return; }
+  var acc = e.target.closest && e.target.closest(".a2ui-accordion-toggle");
+  if (acc) { var card = acc.closest(".a2ui-card"); if (card) { var body = card.querySelector(".a2ui-accordion-body"); if (body) body.classList.toggle("open"); } return; }
+  var ab = e.target.closest && e.target.closest("[data-action]");
+  if (ab && ab.dataset.action) {
+    if (ab.dataset.action === "__back__") {
+      if (navHistory.length > 0) { var prev = JSON.parse(navHistory.pop()); slotData = prev.slotData; frameState = prev.frameState; currentUiMeta = prev.uiMeta || {}; }
+      else { slotData = {}; frameState = "idle"; }
+      renderFrame(); return;
+    }
+    if (ab.dataset.action === "__home__") { navHistory = []; slotData = {}; frameState = "idle"; renderFrame(); return; }
+    if (ab.dataset.action === "__retry__") {
+      if (navHistory.length > 0) { var rp = JSON.parse(navHistory.pop()); slotData = rp.slotData; frameState = rp.frameState; currentUiMeta = rp.uiMeta || {}; }
+      else { slotData = {}; frameState = "idle"; }
+      renderFrame(); return;
+    }
+    postAction(ab.dataset.action, ab.dataset.context ? JSON.parse(ab.dataset.context) : {});
+    var log = document.createElement("div");
+    log.className = "action-log";
+    log.textContent = "\u2192 " + ab.dataset.action + " \u2713";
+    if (ab.parentElement) ab.parentElement.appendChild(log);
+  }
+});
+
+init();

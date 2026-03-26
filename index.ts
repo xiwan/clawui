@@ -12,7 +12,7 @@ import { handleUserAction } from "./src/actions/agent-loop.js";
 import { IntentMatcher, type RagConfig } from "./src/rag/matcher.js";
 import { Type } from "@sinclair/typebox";
 
-import { pushSkeleton, stopProgressStages, pushDoneHeader } from "./src/skeleton/skeleton.js";
+import { pushSkeleton, stopProgressStages, pushDoneHeader, pushTemplateSkeleton } from "./src/skeleton/skeleton.js";
 import { liteRender } from "./src/lite-render.js";
 import { TOOL_DESCRIPTION, toolRoutePrompt, ragReplayPrompt } from "./src/prompts/index.js";
 
@@ -36,6 +36,23 @@ import skillList from "./src/templates/builtin/skill_list.json" with { type: "js
 import fileBrowser from "./src/templates/builtin/file_browser.json" with { type: "json" };
 
 registerAll([textDisplay, form, confirmation, bookingForm, searchResults, dashboard, settings, accordion, dataTable, statusPage, detail, multiCard, homeScreen, skillList, fileBrowser] as any);
+
+import type { LiteRenderResult } from "./src/lite-render.js";
+
+/** 流式预渲染状态 */
+interface PreRenderState {
+  id: string;
+  intent: string;
+  toolResults: string[];
+  preRendered: boolean;
+  liteResult?: LiteRenderResult;
+  _timer?: ReturnType<typeof setTimeout>;
+  _partialBuf?: string;
+  _uiHintParsed?: boolean;
+}
+
+const STREAMING_PRE_RENDER = true;
+const preRenderStates = new Map<string, PreRenderState>();
 
 /** 从渲染参数提取摘要文本，用于 RAG 学习 */
 function extractLearnText(p: A2UIRenderParams): string {
@@ -164,7 +181,7 @@ const plugin = {
 
     /** 发消息给 Agent */
     const agentSessions = new Map<string, string>(); // agentId → sessionId
-    async function sendToAgent(message: string) {
+    async function sendToAgent(message: string, preRender?: PreRenderState) {
       const t0 = Date.now();
       let resolvedAgentId = defaultAgentId;
       if (!sessionKey) {
@@ -191,9 +208,11 @@ const plugin = {
         const t1 = Date.now();
         api.logger?.info?.(`ClawUI timing: route resolved in ${t1 - t0}ms`);
         await api.runtime.subagent.run({ sessionKey, message });
-        api.logger?.info?.(`ClawUI timing: subagent.run total ${Date.now() - t0}ms (LLM ${Date.now() - t1}ms)`);
+        api.logger?.info?.(`ClawUI timing: subagent.run total ${Date.now() - t0}ms (LLM ${Date.now() - t1}ms) [pre-render SKIPPED - subagent path]`);
         return;
-      } catch {}
+      } catch {
+        api.logger?.info?.(`ClawUI subagent.run not available, falling back to runEmbeddedPiAgent`);
+      }
 
       // 方式2: runEmbeddedPiAgent（复用 session）
       try {
@@ -230,7 +249,52 @@ const plugin = {
           trigger: "clawui",
           messageChannel: "clawui",
           timeoutMs: 120_000,
-          runId: `clawui-${Date.now()}`,
+          runId: `clawui-${Date.now()}${preRender ? `-${preRender.id}` : ""}`,
+          onPartialReply: preRender ? (payload) => {
+            if (preRender._uiHintParsed || !payload.text) return;
+            // 累积文本，检测 [UI:template|count|title]
+            preRender._partialBuf = (preRender._partialBuf || "") + payload.text;
+            const m = preRender._partialBuf.match(/\[UI:([a-z_]+)\|(\d+)\|([^\]]+)\]/);
+            if (m) {
+              preRender._uiHintParsed = true;
+              const [, template, countStr, title] = m;
+              const count = parseInt(countStr) || 3;
+              api.logger?.info?.(`ClawUI UI hint: template=${template}, count=${count}, title=${title}`);
+              pushTemplateSkeleton(template, count, title);
+            }
+          } : undefined,
+          shouldEmitToolOutput: preRender ? () => true : undefined,
+          onToolResult: preRender ? async (payload) => {
+            api.logger?.info?.(`ClawUI onToolResult fired: text=${payload.text?.length || 0} chars, preview="${payload.text?.slice(0, 150)}", preRendered=${preRender.preRendered}`);
+            if (preRender.preRendered || !payload.text || payload.text.length < 50) return;
+            // 跳过 a2ui_render / 工具摘要
+            if (payload.text.includes("a2ui_push") || payload.text.includes("A2UI JSONL")) return;
+            if (payload.text.startsWith("\ud83d\udd27") || payload.text.startsWith("Tool ")) return;
+            // 收集结果，延迟触发预渲染（等更多工具结果到达）
+            preRender.toolResults.push(payload.text);
+            if (!preRender._timer) {
+              preRender._timer = setTimeout(async () => {
+                if (preRender.preRendered) return;
+                preRender.preRendered = true;
+                // 用最长的工具结果（最可能是实际数据）
+                const best = preRender.toolResults.sort((a, b) => b.length - a.length)[0];
+                api.logger?.info?.(`ClawUI pre-render: using best result (${best.length} chars of ${preRender.toolResults.length} results)`);
+                try {
+                  const lite = await liteRender(best, preRender.intent, { region: "us-east-1" });
+                  preRender.liteResult = lite;
+                  const rendered = executeRender({ template: lite.template, data: lite.data });
+                  stopProgressStages();
+                  pushToPreview(rendered.jsonl, { template: lite.template, title: lite.data?.title as string });
+                  pushDoneHeader(lite.data?.title as string || lite.template || "完成");
+                  reportTokenUsage(lite.inputTokens, lite.outputTokens);
+                  api.logger?.info?.(`ClawUI pre-render: ${lite.ms}ms, template=${lite.template}`);
+                } catch (e: any) {
+                  preRender.preRendered = false;
+                  api.logger?.warn?.(`ClawUI pre-render failed: ${e.message}`);
+                }
+              }, 2000);
+            }
+          } : undefined,
         });
         api.logger?.info?.(`ClawUI timing: runEmbeddedPiAgent total ${Date.now() - t0}ms (LLM+tools ${Date.now() - t2}ms)`);
       } catch (e: any) {
@@ -304,8 +368,19 @@ const plugin = {
 
     function fallbackToAgent(action: any) {
       const meta = surfaceMeta.get(action.surfaceId || "main");
+      const userText = (action.context?.text as string) || "";
+      // 创建预渲染状态，用唯一 ID 关联
+      let preRender: PreRenderState | undefined;
+      if (STREAMING_PRE_RENDER) {
+        const id = `pr-${Date.now()}`;
+        preRender = { id, intent: userText, toolResults: [], preRendered: false };
+        preRenderStates.set(id, preRender);
+        // 清理超过 60s 的旧状态
+        for (const [k, s] of preRenderStates) { if (Date.now() - parseInt(k.slice(3)) > 60000) preRenderStates.delete(k); }
+        api.logger?.info?.(`ClawUI pre-render: state created id=${id}, intent="${userText}"`);
+      }
       // 立即推送骨架屏，不等 Agent
-      pushSkeleton(meta || { title: (action.context?.text as string) || undefined });
+      pushSkeleton(meta || { title: userText || undefined });
       handleUserAction(
         {
           name: action.name,
@@ -316,7 +391,7 @@ const plugin = {
           uiMeta: meta || action.uiMeta,
         },
         {
-          runAgent: (message) => sendToAgent(message),
+          runAgent: (message) => sendToAgent(message, preRender),
           logger: api.logger,
         },
       );
@@ -348,6 +423,18 @@ const plugin = {
         }
         stopProgressStages();
         const p = params as A2UIRenderParams;
+        // 流式预渲染去重: 找最近的已完成预渲染状态
+        const matchedPre = [...preRenderStates.values()].find(s => s.preRendered && s.liteResult);
+        api.logger?.info?.(`ClawUI a2ui_render: matchedPre=${matchedPre ? `id=${matchedPre.id}, preRendered=${matchedPre.preRendered}, hasLite=${!!matchedPre.liteResult}` : "null"}, hasRawData=${!!(p as any).rawData}`);
+        if (STREAMING_PRE_RENDER && matchedPre?.liteResult && (p as any).rawData) {
+          const lite = matchedPre.liteResult;
+          api.logger?.info?.(`ClawUI skip duplicate liteRender, using pre-render: ${lite.template} (${lite.ms}ms)`);
+          preRenderStates.delete(matchedPre.id);
+          return {
+            content: [{ type: "text", text: "UI already rendered via streaming pre-render." }],
+          };
+        }
+        if (matchedPre) preRenderStates.delete(matchedPre.id);
         // rawData 模式: Agent 只传原始数据，liteRender 自动选模板+格式化
         if ((p as any).rawData) {
           try {
