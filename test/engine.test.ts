@@ -75,7 +75,8 @@ describe("engine — search_results", () => {
     });
     assert.equal(components.find((c) => c.id === "header")?.text, 'Results for "pizza"');
     const card = components.find((c) => c.id === "result-0");
-    assert.equal(card?.title, "Pizza Roma");
+    assert.equal(card?.style, "result-card");
+    assert.equal(components.find((c) => c.id === "result-0-title")?.text, "Pizza Roma");
   });
 });
 
@@ -85,9 +86,10 @@ describe("engine — dashboard", () => {
       template: "dashboard",
       data: { title: "Stats", metrics: [{ label: "Users", value: 1234 }, { label: "Revenue", value: "$5k" }] },
     });
-    assert.equal(components.find((c) => c.id === "metric-0")?.title, "Users");
-    assert.equal(components.find((c) => c.id === "metric-0-text")?.text, "1234");
-    assert.equal(components.find((c) => c.id === "metric-1")?.title, "Revenue");
+    assert.equal(components.find((c) => c.id === "metric-0")?.style, "metric-card");
+    assert.equal(components.find((c) => c.id === "metric-0-label")?.text, "Users");
+    assert.equal(components.find((c) => c.id === "metric-0-value")?.text, "1234");
+    assert.equal(components.find((c) => c.id === "metric-1-label")?.text, "Revenue");
   });
 });
 

@@ -81,6 +81,7 @@ function toV08Component(c: A2UIComponent): { id: string; component: Record<strin
       break;
   }
 
+  if (c.style) props.style = c.style;
   return { id: c.id, component: { [type]: props } };
 }
 

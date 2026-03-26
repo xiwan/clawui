@@ -196,6 +196,68 @@ body { font-family: system-ui, -apple-system, sans-serif; background: #0a0a0a; c
 .a2ui-card.skill-card .a2ui-row { justify-content: space-between; }
 .a2ui-button.skill-run { padding: 6px 14px; font-size: 12px; margin-left: auto; background: #4f46e5; border-color: #4f46e5; }
 
+/* === Metric Card (Dashboard) === */
+.metric-row { display: flex; gap: 12px; flex-wrap: wrap; }
+.metric-row .a2ui-card { flex: 1; min-width: 160px; }
+.a2ui-card.metric-card { background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%); border: 1px solid #2a2a4a; border-radius: 14px; padding: 20px; display: flex; flex-direction: column; gap: 4px; transition: transform 0.2s, box-shadow 0.2s; }
+.a2ui-card.metric-card:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.3); }
+.a2ui-card.metric-card .a2ui-text-body { color: #888; font-size: 12px; text-transform: uppercase; letter-spacing: 0.5px; }
+.a2ui-card.metric-card .a2ui-text-h1 { font-size: 32px; font-weight: 700; color: #fff; line-height: 1.1; }
+.a2ui-card.metric-card .a2ui-text-caption { color: #666; font-size: 11px; margin-top: 4px; }
+.trend-up { color: #4ade80 !important; font-size: 13px; font-weight: 600; }
+.trend-down { color: #f87171 !important; font-size: 13px; font-weight: 600; }
+.trend-neutral { color: #888 !important; font-size: 13px; }
+
+/* === Search Result Card === */
+.a2ui-card.result-card { background: #111; border: 1px solid #1a1a1a; border-radius: 12px; padding: 16px 18px; display: flex; flex-direction: column; gap: 6px; transition: border-color 0.2s, background 0.2s; cursor: default; }
+.a2ui-card.result-card:hover { border-color: #333; background: #161616; }
+.a2ui-card.result-card .a2ui-text-h3 { color: #60a5fa; font-size: 15px; }
+.a2ui-card.result-card .a2ui-text-body { color: #aaa; font-size: 13px; line-height: 1.5; }
+.result-source { color: #555 !important; font-size: 11px; }
+
+/* === Grid Card (multi_card) === */
+.grid-row { display: flex; gap: 12px; flex-wrap: wrap; }
+.grid-row .a2ui-card { flex: 1; min-width: 180px; }
+.a2ui-card.grid-card { background: #151515; border: 1px solid #222; border-radius: 14px; padding: 20px; display: flex; flex-direction: column; gap: 8px; text-align: center; transition: transform 0.2s, border-color 0.2s; }
+.a2ui-card.grid-card:hover { transform: translateY(-2px); border-color: #444; }
+.grid-card-icon { font-size: 28px !important; }
+
+/* === Data Table === */
+.table-head { border-bottom: 2px solid #2a2a2a; padding-bottom: 8px; margin-bottom: 4px; }
+.table-th { color: #888 !important; font-size: 12px !important; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600 !important; }
+.table-row-even { background: #111; border-radius: 6px; padding: 6px 0; }
+.table-row-odd { background: transparent; padding: 6px 0; }
+.table-row-even:hover, .table-row-odd:hover { background: #1a1a1a; }
+.table-cell { font-size: 13px; padding: 2px 0; }
+
+/* === Status Page === */
+.status-detail-row { padding: 8px 0; border-bottom: 1px solid #1a1a1a; }
+.status-label { color: #666 !important; min-width: 100px; }
+.status-value { color: #ddd !important; }
+
+/* === Detail === */
+.detail-field-row { padding: 10px 0; border-bottom: 1px solid #1a1a1a; }
+.detail-label { color: #888 !important; min-width: 120px; font-size: 13px; }
+.detail-value { color: #e0e0e0 !important; }
+
+/* === Accordion === */
+.a2ui-card.accordion-card { background: #111; border: 1px solid #1a1a1a; border-radius: 10px; margin-bottom: 4px; overflow: hidden; transition: border-color 0.2s; }
+.a2ui-card.accordion-card:hover { border-color: #333; }
+
+/* === File Browser === */
+.breadcrumb { display: flex; align-items: center; gap: 0; padding: 8px 4px; flex-wrap: wrap; }
+.crumb-btn { background: none !important; border: none !important; color: #60a5fa !important; padding: 4px 6px !important; font-size: 13px; cursor: pointer; border-radius: 4px; }
+.crumb-btn:hover { background: #1a1a2e !important; }
+.crumb-sep { color: #444 !important; font-size: 13px; padding: 0 2px; }
+.a2ui-card.file-item { background: #111; border: 1px solid transparent; border-radius: 8px; padding: 6px 12px; display: flex; flex-direction: row; align-items: center; gap: 8px; cursor: pointer; transition: background 0.15s, border-color 0.15s; margin-bottom: 1px; }
+.a2ui-card.file-item:hover { background: #1a1a2e; border-color: #2a2a4a; }
+.a2ui-card.file-dir { }
+.a2ui-card.file-dir:hover { background: #162032; border-color: #2a3a5a; }
+.file-icon { font-size: 15px !important; flex-shrink: 0; width: 20px; text-align: center; line-height: 1; }
+.file-name { flex: 1; font-size: 13px !important; color: #ccc !important; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.file-name-dir { color: #fff !important; font-weight: 600 !important; }
+.file-meta { color: #555 !important; font-size: 11px !important; flex-shrink: 0; min-width: 50px; text-align: right; }
+
 /* === Skeleton === */
 .skeleton-line { background: linear-gradient(90deg, #1a1a1a 25%, #252525 50%, #1a1a1a 75%); background-size: 200% 100%; animation: shimmer 1.5s infinite; border-radius: 6px; height: 18px; margin: 6px 0; color: transparent !important; }
 .skeleton-header { height: 22px; opacity: .7; }

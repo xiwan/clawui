@@ -46,11 +46,20 @@ const expanders: Record<string, Expander> = {
 
   search_results: expandArray("results", "results", (item, i) => {
     const cardId = `result-${i}`;
-    const textId = `${cardId}-text`;
-    return [
-      { id: cardId, component: "Card", child: textId, title: item.title },
-      { id: textId, component: "Text", text: `${item.snippet || item.subtitle || item.description || ""}`.trim() },
+    const titleId = `${cardId}-title`;
+    const snippetId = `${cardId}-snippet`;
+    const children = [titleId, snippetId];
+    const comps: Record<string, unknown>[] = [
+      { id: titleId, component: "Text", text: String(item.title || ""), variant: "h3" },
+      { id: snippetId, component: "Text", text: `${item.snippet || item.subtitle || item.description || ""}`.trim(), variant: "body" },
     ];
+    if (item.source || item.url) {
+      const srcId = `${cardId}-src`;
+      children.push(srcId);
+      comps.push({ id: srcId, component: "Text", text: String(item.source || item.url || ""), variant: "caption", style: "result-source" });
+    }
+    comps.push({ id: cardId, component: "Card", children, style: "result-card" });
+    return comps;
   }),
 
   dashboard: (components, data) => {
@@ -66,18 +75,33 @@ const expanders: Record<string, Expander> = {
       for (let j = i; j < Math.min(i + cols, items.length); j++) {
         const item = items[j];
         const cardId = `metric-${j}`;
-        const textId = `${cardId}-text`;
-        const children = [textId];
+        const labelId = `${cardId}-label`;
+        const valueId = `${cardId}-value`;
+        const children = [labelId, valueId];
         cellIds.push(cardId);
-        generated.push({ id: textId, component: "Text", text: String(item.value ?? ""), variant: "h2" });
+        // 标签行
+        generated.push({ id: labelId, component: "Text", text: String(item.label ?? ""), variant: "body" });
+        // 数值（大字）
+        generated.push({ id: valueId, component: "Text", text: String(item.value ?? ""), variant: "h1" });
+        // 趋势指示
         if (item.trend) {
           const trendId = `${cardId}-trend`;
           children.push(trendId);
-          generated.push({ id: trendId, component: "Text", text: String(item.trend) });
+          const trendStr = String(item.trend);
+          const isUp = trendStr.includes("↑") || trendStr.includes("+");
+          const isDown = trendStr.includes("↓") || trendStr.includes("-");
+          const trendStyle = isUp ? "trend-up" : isDown ? "trend-down" : "trend-neutral";
+          generated.push({ id: trendId, component: "Text", text: trendStr, style: trendStyle });
         }
-        generated.push({ id: cardId, component: "Card", children, title: item.label });
+        // 描述/副标题
+        if (item.description || item.subtitle) {
+          const descId = `${cardId}-desc`;
+          children.push(descId);
+          generated.push({ id: descId, component: "Text", text: String(item.description || item.subtitle), variant: "caption" });
+        }
+        generated.push({ id: cardId, component: "Card", children, style: "metric-card" });
       }
-      generated.push({ id: rowId, component: "Row", children: cellIds });
+      generated.push({ id: rowId, component: "Row", children: cellIds, style: "metric-row" });
     }
     return components
       .map(c => c.id === "metrics" ? { ...c, component: "Column", children: rowIds } : c)
@@ -96,7 +120,7 @@ const expanders: Record<string, Expander> = {
     const titleId = `${sectionId}-title`;
     const contentId = `${sectionId}-content`;
     return [
-      { id: sectionId, component: "Card", children: [titleId, contentId], title: item.title },
+      { id: sectionId, component: "Card", children: [titleId, contentId], title: item.title, style: "accordion-card" },
       { id: titleId, component: "Button", child: `${titleId}-label`, action: { event: { name: `toggle-${i}` } }, accordion: true },
       { id: `${titleId}-label`, component: "Text", text: `▶ ${item.title}` },
       { id: contentId, component: "Text", text: item.content || "", accordion_body: true },
@@ -108,25 +132,23 @@ const expanders: Record<string, Expander> = {
     const rows = (data.rows || []) as Record<string, unknown>[];
     if (!columns.length) return components;
 
-    // 表头
     const headIds = columns.map((c, i) => `th-${i}`);
-    const headCells = columns.map((c, i) => ({ id: `th-${i}`, component: "Text", text: c.label, variant: "h3" }));
+    const headCells = columns.map((c, i) => ({ id: `th-${i}`, component: "Text", text: c.label, variant: "h3", style: "table-th" }));
 
-    // 数据行
     const rowIds: string[] = [];
     const rowComponents: Record<string, unknown>[] = [];
     for (let r = 0; r < rows.length; r++) {
       const rowId = `row-${r}`;
       rowIds.push(rowId);
       const cellIds = columns.map((c, ci) => `row-${r}-cell-${ci}`);
-      rowComponents.push({ id: rowId, component: "Row", children: cellIds });
+      rowComponents.push({ id: rowId, component: "Row", children: cellIds, style: r % 2 === 0 ? "table-row-even" : "table-row-odd" });
       for (let ci = 0; ci < columns.length; ci++) {
-        rowComponents.push({ id: `row-${r}-cell-${ci}`, component: "Text", text: String(rows[r][columns[ci].key] ?? "") });
+        rowComponents.push({ id: `row-${r}-cell-${ci}`, component: "Text", text: String(rows[r][columns[ci].key] ?? ""), style: "table-cell" });
       }
     }
 
     return components
-      .map(c => c.id === "table-head" ? { ...c, children: headIds } : c)
+      .map(c => c.id === "table-head" ? { ...c, children: headIds, style: "table-head" } : c)
       .map(c => c.id === "table-body" ? { ...c, children: rowIds } : c)
       .concat(headCells, rowComponents);
   },
@@ -134,18 +156,18 @@ const expanders: Record<string, Expander> = {
   status_page: expandArray("details", "details", (item, i) => {
     const rowId = `detail-${i}`;
     return [
-      { id: rowId, component: "Row", children: [`${rowId}-label`, `${rowId}-value`] },
-      { id: `${rowId}-label`, component: "Text", text: `${item.label}:`, variant: "h3" },
-      { id: `${rowId}-value`, component: "Text", text: String(item.value ?? "") },
+      { id: rowId, component: "Row", children: [`${rowId}-label`, `${rowId}-value`], style: "status-detail-row" },
+      { id: `${rowId}-label`, component: "Text", text: `${item.label}`, variant: "body", style: "status-label" },
+      { id: `${rowId}-value`, component: "Text", text: String(item.value ?? ""), variant: "h3", style: "status-value" },
     ];
   }),
 
   detail: expandArray("fields", "fields", (item, i) => {
     const rowId = `field-row-${i}`;
     return [
-      { id: rowId, component: "Row", children: [`${rowId}-label`, `${rowId}-value`] },
-      { id: `${rowId}-label`, component: "Text", text: `${item.label}:`, variant: "h3" },
-      { id: `${rowId}-value`, component: "Text", text: String(item.value ?? "") },
+      { id: rowId, component: "Row", children: [`${rowId}-label`, `${rowId}-value`], style: "detail-field-row" },
+      { id: `${rowId}-label`, component: "Text", text: `${item.label}`, variant: "body", style: "detail-label" },
+      { id: `${rowId}-value`, component: "Text", text: String(item.value ?? ""), style: "detail-value" },
     ];
   }),
 
@@ -213,22 +235,107 @@ const expanders: Record<string, Expander> = {
       for (let j = i; j < Math.min(i + cols, cards.length); j++) {
         const card = cards[j];
         const cardId = `card-${j}`;
-        const textId = `${cardId}-text`;
+        const children: string[] = [];
         cellIds.push(cardId);
-        const children = [textId];
-        if (card.icon) children.unshift(`${cardId}-icon`);
-        generated.push({ id: cardId, component: "Card", title: card.title, children, ...(card.action ? { clickAction: card.action } : {}) });
-        if (card.icon) generated.push({ id: `${cardId}-icon`, component: "Text", text: String(card.icon), variant: "h1" });
-        generated.push({ id: textId, component: "Text", text: String(card.content || "") });
+        if (card.icon) {
+          children.push(`${cardId}-icon`);
+          generated.push({ id: `${cardId}-icon`, component: "Text", text: String(card.icon), variant: "h1", style: "grid-card-icon" });
+        }
+        if (card.title) {
+          children.push(`${cardId}-title`);
+          generated.push({ id: `${cardId}-title`, component: "Text", text: String(card.title), variant: "h3" });
+        }
+        if (card.content) {
+          children.push(`${cardId}-text`);
+          generated.push({ id: `${cardId}-text`, component: "Text", text: String(card.content), variant: "body" });
+        }
+        generated.push({ id: cardId, component: "Card", children, style: "grid-card", ...(card.action ? { clickAction: card.action } : {}) });
       }
-      generated.push({ id: rowId, component: "Row", children: cellIds });
+      generated.push({ id: rowId, component: "Row", children: cellIds, style: "grid-row" });
     }
 
     return components
       .map(c => c.id === "grid" ? { ...c, children: rowIds } : c)
       .concat(generated);
   },
+
+  file_browser: (components, data) => {
+    const path = String(data.path || "/");
+    const items = (data.items || []) as Record<string, unknown>[];
+
+    // 面包屑：拆路径生成可点击的导航
+    const parts = path.split("/").filter(Boolean);
+    const crumbIds: string[] = ["crumb-root"];
+    const generated: Record<string, unknown>[] = [
+      { id: "crumb-root", component: "Button", child: "crumb-root-label",
+        action: { event: { name: "submit" }, context: { text: "列出 / 目录下的文件和文件夹，用 file_browser 模板渲染" } },
+        style: "crumb-btn" },
+      { id: "crumb-root-label", component: "Text", text: "~" },
+    ];
+    let accumulated = "";
+    for (let i = 0; i < parts.length; i++) {
+      accumulated += "/" + parts[i];
+      const id = `crumb-${i}`;
+      const sepId = `crumb-sep-${i}`;
+      crumbIds.push(sepId, id);
+      generated.push(
+        { id: sepId, component: "Text", text: "/", style: "crumb-sep" },
+        { id, component: "Button", child: `${id}-label`,
+          action: { event: { name: "submit" }, context: { text: `列出 ${accumulated} 目录下的文件和文件夹，用 file_browser 模板渲染` } },
+          style: "crumb-btn" },
+        { id: `${id}-label`, component: "Text", text: parts[i] },
+      );
+    }
+
+    // 文件列表
+    const fileIds: string[] = [];
+    for (let i = 0; i < items.length; i++) {
+      const item = items[i];
+      const isDir = item.type === "directory" || item.type === "dir";
+      const id = `file-${i}`;
+      const name = String(item.name || "");
+      const icon = isDir ? "📁" : fileIcon(name);
+      const size = item.size ? String(item.size) : "";
+      const modified = item.modified ? String(item.modified) : "";
+
+      fileIds.push(id);
+      const children = [`${id}-icon`, `${id}-name`];
+      if (size) children.push(`${id}-size`);
+      if (modified) children.push(`${id}-time`);
+
+      const filePath = `${path === "/" ? "" : path}/${name}`;
+      const prompt = isDir
+        ? `列出 ${filePath} 目录下的文件和文件夹，用 file_browser 模板渲染，包含 name、type、size、modified`
+        : `读取文件 ${filePath} 的内容，用 text_display 模板渲染，title 为文件名`;
+
+      generated.push(
+        { id, component: "Card", children, style: isDir ? "file-item file-dir" : "file-item",
+          clickAction: { event: { name: "submit" }, context: { text: prompt } } },
+        { id: `${id}-icon`, component: "Text", text: icon, style: "file-icon" },
+        { id: `${id}-name`, component: "Text", text: name, variant: "body", style: isDir ? "file-name file-name-dir" : "file-name" },
+      );
+      if (size) generated.push({ id: `${id}-size`, component: "Text", text: size, variant: "caption", style: "file-meta" });
+      if (modified) generated.push({ id: `${id}-time`, component: "Text", text: modified, variant: "caption", style: "file-meta" });
+    }
+
+    return components
+      .map(c => c.id === "breadcrumb" ? { ...c, children: crumbIds, style: "breadcrumb" } : c)
+      .map(c => c.id === "file-list" ? { ...c, children: fileIds } : c)
+      .concat(generated);
+  },
 };
+
+/** 文件图标映射 */
+function fileIcon(name: string): string {
+  const ext = name.split(".").pop()?.toLowerCase() || "";
+  const map: Record<string, string> = {
+    ts: "📘", js: "📒", json: "📋", md: "📝", txt: "📄", py: "🐍",
+    html: "🌐", css: "🎨", sh: "⚙️", yml: "📐", yaml: "📐",
+    png: "🖼️", jpg: "🖼️", svg: "🖼️", gif: "🖼️",
+    lock: "🔒", log: "📜", env: "🔑",
+  };
+  return map[ext] || "📄";
+}
 
 /** 模板默认数据（用户未提供时的 fallback 值） */
 const templateDefaults: Record<string, Record<string, unknown>> = {

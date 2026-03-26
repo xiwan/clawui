@@ -33,8 +33,9 @@ import detail from "./src/templates/builtin/detail.json" with { type: "json" };
 import multiCard from "./src/templates/builtin/multi_card.json" with { type: "json" };
 import homeScreen from "./src/templates/builtin/home_screen.json" with { type: "json" };
 import skillList from "./src/templates/builtin/skill_list.json" with { type: "json" };
+import fileBrowser from "./src/templates/builtin/file_browser.json" with { type: "json" };
 
-registerAll([textDisplay, form, confirmation, bookingForm, searchResults, dashboard, settings, accordion, dataTable, statusPage, detail, multiCard, homeScreen, skillList] as any);
+registerAll([textDisplay, form, confirmation, bookingForm, searchResults, dashboard, settings, accordion, dataTable, statusPage, detail, multiCard, homeScreen, skillList, fileBrowser] as any);
 
 /** 从渲染参数提取摘要文本，用于 RAG 学习 */
 function extractLearnText(p: A2UIRenderParams): string {

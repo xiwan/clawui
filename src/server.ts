@@ -8,7 +8,7 @@ import http from "node:http";
 import { executeRender } from "./tool.js";
 import type { ActionMapping } from "./actions/router.js";
 
-export const VERSION = "0.4.21";
+export const VERSION = "0.4.26";
 
 const DEFAULT_PORT = 19001;
 

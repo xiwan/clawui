@@ -1,0 +1,11 @@
+{
+  "id": "file_browser",
+  "name": "File Browser",
+  "description": "Finder-style file browser with navigation",
+  "components": [
+    { "id": "root", "component": "Column", "children": ["breadcrumb", "file-list"] },
+    { "id": "breadcrumb", "component": "Row", "children": [] },
+    { "id": "file-list", "component": "Column", "children": [] }
+  ],
+  "defaultActions": {}
+}
