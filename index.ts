@@ -437,6 +437,8 @@ const plugin = {
         if (matchedPre) preRenderStates.delete(matchedPre.id);
         // rawData 模式: Agent 只传原始数据，liteRender 自动选模板+格式化
         if ((p as any).rawData) {
+          // 清理 [UI:...] 标记，防止泄漏到渲染内容
+          (p as any).rawData = ((p as any).rawData as string).replace(/\[UI:[^\]]*\]/g, "").trim();
           try {
             const lite = await liteRender((p as any).rawData, (p as any).intent || "", { region: "us-east-1" });
             api.logger?.info?.(`ClawUI liteRender: ${lite.ms}ms, in=${lite.inputTokens}, out=${lite.outputTokens}, template=${lite.template}`);
